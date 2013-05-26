@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Topmenu and the submenus are based of the example found at this location http://blog.skeltonnetworks.com/2010/03/python-curses-custom-menu/
-# The rest of the work was done by Matthew Bennett and he requests you keep these two mentions when you reuse the code :-)
-# Basic code refactoring by Andrew Scheller
+
  
 from time import sleep
 import curses
@@ -40,11 +38,11 @@ data = []     #<---- this is a list of dictionaries
 titles = []   #<---this is a list that contains the title_row ..[('x', 'y'), ('z', 'w')]
 # set pyrax creds without creds file
 #pyrax.set_credentials('USERNAME', 'API_KEY')
-
+  
 menu_data = {
  'title': "Rackspace Cloud Bridge", 'type': MENU, 'subtitle': "Pick your poison...",
  'options':[
-   { 'title': "Authenticate", 'type': MENU, 'subtitle': "Please Select an action...",
+   { 'title': "Authenticate", 'type': MENU, 'subtitle': "Please Select an Action...",
    'options': [
      { 'title': "Authenticate using local credentials file", 'type': COMMAND },
      { 'title': "Enter credentials manually", 'type': COMMAND },
@@ -52,7 +50,13 @@ menu_data = {
    },
    { 'title': "Show Credentials", 'type': COMMAND },
    { 'title': "List Servers", 'type': COMMAND },
-   { 'title': "List Images", 'type': COMMAND },
+   { 'title': "List Flavors", 'type': COMMAND },
+   { 'title': "List Images", 'type': MENU, 'subtitle': "Please Select an Action...",
+   'options':[
+     { 'title': "List My Images", 'type': COMMAND },
+     { 'title': "List Base Images", 'type': COMMAND },
+    ]
+    },
    { 'title': "List Load Balancers", 'type': COMMAND },
    { 'title': "List Databases", 'type': COMMAND },
    { 'title': "List Cloud Files", 'type': COMMAND },
@@ -113,20 +117,26 @@ def runmenu(menu, parent):
   # return index of the selected item
   return pos
 
+#get the terminal row and column length
+def terminal_size():
+  rows, cols = os.popen('stty size', 'r').read().split()
+  return {'rows':rows, 'columns':cols}
 
 #Authenticate and get credentials and services
-def servers_title():
-    print "============================================"
-    print "----------------SERVER LIST----------------"
-    print "============================================"
+def myTitle(title):
+    term = terminal_size()
+    col = term['columns']
+    row = term['rows']
+    upper_title_line = '=' * int(col)
+    lower_title_line = upper_title_line
+    x = int(col) - len(title)
+    x2 = x / 2
+    y = '-' * x2
+    print upper_title_line 
+    print y + title + y
+    print lower_title_line
     print ""
     print ""
-    print ""
-
-def lb_title():
-    print "============================================"
-    print "---------------Load Balancers---------------"
-    print "============================================"
     print ""
 
 def clear_screen():
@@ -163,17 +173,26 @@ def cust_ddi():
   print "DDI: %s" % tennant_ddi
 
 def getcreds():
-  pyrax.set_credential_file(CREDS_FILE)
-  auth_successful = pyrax.identity.authenticated
-  print ""
-  print ""
-  print "Authentication successful: %s" % auth_successful
-  name()
-  token()
-  expires()
-  default_region()
-  cust_ddi()
-  clear_screen()
+  try:
+    pyrax.set_credential_file(CREDS_FILE)
+  except Exception, e:
+    print ""
+    print ""
+    print e
+    print ""
+    print ""
+    clear_screen()
+  else:
+    auth_successful = pyrax.identity.authenticated
+    print ""
+    print ""
+    print "Authentication successful: %s" % auth_successful
+    name()
+    token()
+    expires()
+    default_region()
+    cust_ddi()
+    clear_screen()
 
 def services():
   services = json.dumps(pyrax.identity.services, sort_keys=True, indent=2, separators=(',', ': '))
@@ -198,12 +217,11 @@ def input_user_creds():
   clear_screen()
 
 def auth_check():
-  try:
-    authed = pyrax.identity.authenticated
-    if authed:
-      return True
-  except Exception:
-    not_authed()
+  authed = pyrax.identity.authenticated
+  if authed:
+    return True
+  else:
+    return False
 
 def not_authed():
   print ""
@@ -282,10 +300,27 @@ def format_as_table(data, keys, header=None, sort_by_key=None, sort_order_revers
         formatted_data += format % tuple(data_to_format)
     return formatted_data
 
+def flavorlist():
+  print ""
+  print ""
+  myTitle('MY FLAVOR LIST')
+  cs = pyrax.cloudservers
+  flvrs = cs.flavors.list()
+  my_flvrs = [flvr for flvr in flvrs]
+  header = ['Flavor Name', 'ID', 'RAM', 'Disk', 'VCPUs', 'Swap' ]
+  keys = ['name', 'id', 'ram', 'disk', 'vcpus', 'swap' ]
+  sort_by_key = 'id'
+  sort_order_reverse = False
+  data = []
+  for flv in my_flvrs:
+    data.append({'name':flv.name, 'id':flv.id, 'ram':flv.ram, 'disk':flv.disk, 'vcpus':flv.vcpus, 'swap':flv.swap})
+  print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
+  clear_screen()
+
 def serverlist():
   print ""
   print ""
-  servers_title()
+  myTitle('CLOUD SERVERS')
   cs = pyrax.cloudservers  #use cs.servers.list()
   svrs = cs.servers.list()
   my_servers = [svr for svr in svrs]
@@ -296,46 +331,83 @@ def serverlist():
   ord_servers = svrs_ord.servers.list()
   my_ord_servers = [svr for svr in ord_servers]
   all_servers = dfw_servers + ord_servers
-  header = ['Server Name', 'Region', 'Server UUID']
-  keys = ['name', 'region', 'UUID']
+  header = ['Server Name', 'Region', 'Server UUID', '  Public IP  ', '  Private IP  ', 'Status' ]
+  keys = ['name', 'region', 'UUID', 'public_ip', 'private_ip', 'status' ]
   sort_by_key = 'region'
   sort_order_reverse = False
   #region = []
   data = []
   for pos, svr in enumerate(my_dfw_servers):
     region = 'DFW'
-    data.append({'pos': pos + 1, 'name':svr.name, 'UUID':svr.id, 'region':region})
+    public_ip = svr.addresses['public'][0]['addr']
+    private_ip = svr.addresses['private'][0]['addr']
+    status = svr.status
+    data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':status})
   for pos, svr in enumerate(my_ord_servers):
     region = 'ORD'
-    data.append({'pos': pos + 1, 'name': svr.name, 'UUID':svr.id, 'region':region})
+    data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':status})
   print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
   clear_screen()
 
-def getimagelist():
+def getimagelist(base=False):
   print ""
   print ""
+  myTitle('MY IMAGES')
   ## Print list of available images with imageID
   cs = pyrax.cloudservers
-  all_imgs = cs.images.list()
+  all_base_images = cs.images.list()
+  base_images = [img for img in all_base_images if not hasattr(img, "server")]
+  svrs_dfw = pyrax.connect_to_cloudservers(region="DFW")
+  svrs_ord = pyrax.connect_to_cloudservers(region="ORD")
+  dfw_images = svrs_dfw.images.list()
+  ord_images = svrs_ord.images.list()
+  all_imgs = dfw_images + ord_images
   images = [img for img in all_imgs if hasattr(img, "server")]
+  sort_by_key = ''
   if not images:
     print ""
     print ""
     print "You have no images!"
     clear_screen()
-  img_dict = {}
-  for pos, img in enumerate(images):
-    print "%s: %s" % (pos + 1, img.name)
-    img_dict[str(pos)] = img
+  my_dfw_images = [img for img in dfw_images if hasattr(img, "server")]
+  my_ord_images = [img for img in ord_images if hasattr(img, "server")]
+  if base:
+    data = []
+    header = ['Image Name', 'Image ID']
+    keys = ['name', 'ID']
+#    sor_by_key = 'name'
+    sort_order_reverse = False
+    for img in base_images:
+      data.append({'name':img.name, 'ID':img.id})
+    print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
+    clear_screen()
+  else:
+    data = []
+    header = ['Image Name', 'Region', 'Image ID', 'Min RAM', 'Min Disk', 'Status', 'Progress' ]
+    keys = ['name', 'region', 'ID', 'minram', 'mindisk', 'status', 'progress' ]
+ #   sort_by_key = 'region'
+    sort_order_reverse = False
+    for pos,img in enumerate(my_dfw_images):
+      region = 'DFW'
+      data.append({'pos':pos + 1, 'name':img.name, 'region':region, 'ID':img.id, 'minram':img.minRam, 'mindisk':img.minDisk, 'status':img.status, 'progress':img.progress})
+    for pos, img in enumerate(my_ord_images):
+      region = 'ORD'
+      data.append({'pos':pos + 1, 'name':img.name, 'region':region, 'ID':img.id, 'minram':img.minRam, 'mindisk':img.minDisk, 'status':img.status, 'progress':img.progress})
+    print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
     clear_screen()
 
 def getLBlist():
-  auth_check()
-  print ""
-  print ""
   lb = pyrax.cloud_loadbalancers
   all_lbs = lb.list()
   lbs = [loadb for loadb in all_lbs]
+  header = [ 'Load Balancer Name', '  IP Address  ', 'Status', 'Protocol', 'Port' ]
+  keys = [ 'name', 'public_ip', 'status', 'protocol', 'port' ]
+  sort_by_key = 'status'
+  sort_order_reverse = False
+  data = []
+  for pos, lb in enumerate(lbs):
+    public_ip = lb.virtual_ips[0].address
+    data.append({'pos': pos + 1, 'name':lb.name, 'public_ip':public_ip, 'status':lb.status, 'protocol':lb.protocol, 'port':lb.port})
   if not lbs:
     print ""
     print ""
@@ -344,18 +416,8 @@ def getLBlist():
   else:
     print ""
     print ""
-    lb_title()
-#     print "Name: %s" % lbs.name
-#     print "ID: %s" % lbs.id
-#     print "Status: %s" % lbs.status
-#     print "Nodes: %s" % lbs.nodes
-#     print "Virtual IPs: %s" % lbs.virtual_ips
-#     print "Algorithm: %s" % lbs.algorithm
-#     print "Protocol: %s" % lbs.protocol
-#     clear_screen()
-    my_lbs = [load_b for load_b in lbs]
-    for pos, my_lb in enumerate(my_lbs):
-      print "%s: %s" % (pos +1, my_lb.name)
+    myTitle('LOAD BALANCERS')
+    print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
     clear_screen()
 
 def getDBlist():
@@ -379,12 +441,16 @@ def processmenu(menu, parent=None):
         input_user_creds()
       if menu['options'][getin]['title'] == 'List Servers':
       	serverlist()
-      if menu['options'][getin]['title'] == 'List Images':
+      if menu['options'][getin]['title'] == 'List My Images':
         getimagelist()
+      if menu['options'][getin]['title'] == 'List Base Images':
+        getimagelist(base=True)
       if menu['options'][getin]['title'] == 'Show Credentials':
         show_credentials()
       if menu['options'][getin]['title'] == 'List Load Balancers':
         getLBlist()
+      if menu['options'][getin]['title'] == 'List Flavors':
+        flavorlist()
       curses.reset_prog_mode()   # reset to 'current' curses environment
       curses.curs_set(1)         # reset doesn't do this right
       curses.curs_set(0)
