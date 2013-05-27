@@ -367,6 +367,9 @@ def serverlist():
   sort_order_reverse = False
   #region = []
   data = []
+  public_ip = ''
+  private_ip = ''
+  status = ''
   for pos, svr in enumerate(my_dfw_servers):
     region = 'DFW'
     public_ip = svr.addresses['public'][0]['addr']
@@ -466,8 +469,8 @@ def getCNlist():
   all_containers = dfw_containers + ord_containers
   header = ['Container Name', 'Total Objects', 'Size', 'Region' ]
   keys = ['name', 'total_objects', 'size', 'region' ]
-  sort_by_key = 'region'
-  sort_order_reverse = False
+  sort_by_key = 'total_objects'
+  sort_order_reverse = True
   #region = []
   data = []
   for cn in dfw_containers:
