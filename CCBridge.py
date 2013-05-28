@@ -172,8 +172,14 @@ def myTitle(title):
 def clear_screen():
   print ""
   print ""
-  raw_input("Press Enter to continue...")
-  screen.clear() #clears previous screen on key press and updates display based on pos
+  try:
+    raw_input("Press Enter to continue...")
+    screen.clear()
+  except (KeyboardInterrupt,EOFError), e:
+    screen.clear() #clears previous screen on key press and updates display based on pos
+  except:
+    screen.clear() #clears previous screen on key press and updates display based on pos
+    
 
 def get_API_key():
   my_api_key = pyrax.identity.api_key
@@ -557,6 +563,9 @@ def processmenu(menu, parent=None):
           exitmenu = True
 
 # Main program
-processmenu(menu_data)
+try:
+  processmenu(menu_data)
+except KeyboardInterrupt, e:
+  curses.endwin() #VITAL! This closes out the menu system and returns you to the bash prompt.
 curses.endwin() #VITAL! This closes out the menu system and returns you to the bash prompt.
 os.system('clear')
