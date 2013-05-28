@@ -175,6 +175,10 @@ def clear_screen():
   raw_input("Press Enter to continue...")
   screen.clear() #clears previous screen on key press and updates display based on pos
 
+def get_API_key():
+  my_api_key = pyrax.identity.api_key
+  print "API key: %s" % my_api_key
+
 #print token
 def token():
   token = pyrax.identity.token
@@ -218,6 +222,7 @@ def getcreds():
     print ""
     print "Authentication successful: %s" % auth_successful
     name()
+    get_API_key()
     token()
     expires()
     default_region()
@@ -266,6 +271,7 @@ def show_credentials():
     print ""
     name()
     cust_ddi()
+    get_API_key()
     token()
     expires()
     default_region()
@@ -367,17 +373,37 @@ def serverlist():
   sort_order_reverse = False
   #region = []
   data = []
-  public_ip = ''
-  private_ip = ''
+  #public_ip = ''
+  #private_ip = ''
   status = ''
   for pos, svr in enumerate(my_dfw_servers):
     region = 'DFW'
-    public_ip = svr.addresses['public'][0]['addr']
-    private_ip = svr.addresses['private'][0]['addr']
+    public_ip = []
+    private_ip = []
+    for i in range(len(svr.addresses['public'])):
+      if svr.addresses['public'][i]['version'] == 4:
+        public_ip.append(svr.addresses['public'][i]['addr'])
+        public_ip = ",".join(public_ip)
+    for i in range(len(svr.addresses['private'])):
+      if svr.addresses['private'][i]['version'] == 4:
+        private_ip.append(svr.addresses['private'][i]['addr'])
+        private_ip = ",".join(private_ip)
+    #public_ip = svr.addresses['public'][0]['addr']
+    #private_ip = svr.addresses['private'][0]['addr']
     status = svr.status
     data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':status})
   for pos, svr in enumerate(my_ord_servers):
     region = 'ORD'
+    public_ip = []
+    private_ip = []
+    for i in range(len(svr.addresses['public'])):
+      if svr.addresses['public'][i]['version'] == 4:
+        public_ip.append(svr.addresses['public'][i]['addr'])
+        public_ip = ",".join(public_ip)
+    for i in range(len(svr.addresses['private'])):
+      if svr.addresses['private'][i]['version'] == 4:
+        private_ip.append(svr.addresses['private'][i]['addr'])
+        private_ip = ",".join(private_ip)
     data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':status})
   print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
   clear_screen()
