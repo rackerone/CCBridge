@@ -24,6 +24,33 @@ import json
 from operator import itemgetter
 from math import log
 
+###########################
+#SET UP GLOBAL VARIABLES
+MENU = "menu"
+COMMAND = "command"
+EXITMENU = "exitmenu"
+CREDS_FILE = os.path.expanduser("~/.rackspace_cloud_credentials")
+LOG_FILE = "/var/log/CCBridge.log"
+data = []     #<---- this is a list of dictionaries
+titles = []   #<---this is a list that contains the title_row ..[('x', 'y'), ('z', 'w')]
+unit_list = zip(['bytes', 'kB', 'MB', 'GB', 'TB', 'PB'], [0, 0, 1, 2, 2, 2])     #<-- used in bytes conversion in byte_converter()
+
+#END GLOBAL VARIABLE SET UP ^
+############################
+#SET UP LOGGING    <---need root privileges to create log file
+
+#create log file if it does not exist
+# if not os.path.exists("/var/log/CCBridge.log"):
+#   file = open(LOG_FILE, 'w')
+#   file.write('')
+#   file.close()
+# else:
+#   pass
+
+#END LOGGING SET UP ^
+#####################
+#INITIALIZE CURSES
+
 #initializes a new window for capturing key presses
 screen = curses.initscr()
 
@@ -44,16 +71,10 @@ curses.init_pair(1,curses.COLOR_BLACK, curses.COLOR_WHITE) # Sets up color pair 
 h = curses.color_pair(1) #h is the coloring for a highlighted menu option
 n = curses.A_NORMAL #n is the coloring for a non highlighted menu option
 
-MENU = "menu"
-COMMAND = "command"
-EXITMENU = "exitmenu"
-CREDS_FILE = os.path.expanduser("~/.rackspace_cloud_credentials")
-data = []     #<---- this is a list of dictionaries
-titles = []   #<---this is a list that contains the title_row ..[('x', 'y'), ('z', 'w')]
-unit_list = zip(['bytes', 'kB', 'MB', 'GB', 'TB', 'PB'], [0, 0, 1, 2, 2, 2])     #<-- used in bytes conversion in byte_converter()
-# set pyrax creds without creds file
-#pyrax.set_credentials('USERNAME', 'API_KEY')
-  
+#END CURSES SETUP ^
+#######################
+#CREATE THE MENUS
+
 menu_data = {
  'title': "Rackspace Cloud Bridge", 'type': MENU, 'subtitle': "Pick your poison...",
  'options':[
@@ -132,7 +153,49 @@ def runmenu(menu, parent):
   # return index of the selected item
   return pos
 
+# This function calls showmenu and then acts on the selected item
+def processmenu(menu, parent=None):
+  optioncount = len(menu['options'])
+  exitmenu = False
+  while not exitmenu: #Loop until the user exits the menu
+    getin = runmenu(menu, parent)
+    if getin == optioncount:
+        exitmenu = True
+    elif menu['options'][getin]['type'] == COMMAND:
+      curses.def_prog_mode()    # save curent curses environment
+      os.system('reset')
+      if menu['options'][getin]['title'] == 'Authenticate using local credentials file':
+		getcreds()
+#      os.system(menu['options'][getin]['command']) # run the command - bash
+      if menu['options'][getin]['title'] == 'Enter credentials manually':
+        input_user_creds()
+      if menu['options'][getin]['title'] == 'List Servers':
+      	serverlist()
+      if menu['options'][getin]['title'] == 'List My Images':
+        getimagelist()
+      if menu['options'][getin]['title'] == 'List Base Images':
+        getimagelist(base=True)
+      if menu['options'][getin]['title'] == 'Show Credentials':
+        show_credentials()
+      if menu['options'][getin]['title'] == 'List Load Balancers':
+        getLBlist()
+      if menu['options'][getin]['title'] == 'List Flavors':
+        flavorlist()
+      if menu['options'][getin]['title'] == 'List Cloud Files':
+        getCNlist()
+      curses.reset_prog_mode()   # reset to 'current' curses environment
+      curses.curs_set(1)         # reset doesn't do this right
+      curses.curs_set(0)
+    elif menu['options'][getin]['type'] == MENU:
+          screen.clear() #clears previous screen on key press and updates display based on pos
+          processmenu(menu['options'][getin], menu) # display the submenu
+          screen.clear() #clears previous screen on key press and updates display based on pos
+    elif menu['options'][getin]['type'] == EXITMENU:
+          exitmenu = True
+
+#END MENU SET UP  ^
 ############################
+#FUNCTIONS
 
 def terminal_size():
   """Get the terminal row and column length for building fit-to-screen content"""
@@ -396,8 +459,7 @@ def serverlist():
         private_ip = ",".join(private_ip)
     #public_ip = svr.addresses['public'][0]['addr']
     #private_ip = svr.addresses['private'][0]['addr']
-    status = svr.status
-    data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':status})
+    data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':svr.status})
   for pos, svr in enumerate(my_ord_servers):
     region = 'ORD'
     public_ip = []
@@ -410,7 +472,7 @@ def serverlist():
       if svr.addresses['private'][i]['version'] == 4:
         private_ip.append(svr.addresses['private'][i]['addr'])
         private_ip = ",".join(private_ip)
-    data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':status})
+    data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':svr.status})
   print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
   clear_screen()
 
@@ -465,14 +527,14 @@ def getLBlist():
   lb = pyrax.cloud_loadbalancers
   all_lbs = lb.list()
   lbs = [loadb for loadb in all_lbs]
-  header = [ 'Load Balancer Name', '  IP Address  ', 'Status', 'Protocol', 'Port' ]
-  keys = [ 'name', 'public_ip', 'status', 'protocol', 'port' ]
+  header = [ 'Load Balancer Name', '  IP Address  ', 'Protocol', 'Port', 'Status' ]
+  keys = [ 'name', 'public_ip', 'protocol', 'port', 'status' ]
   sort_by_key = 'status'
   sort_order_reverse = False
   data = []
   for pos, lb in enumerate(lbs):
     public_ip = lb.virtual_ips[0].address
-    data.append({'pos': pos + 1, 'name':lb.name, 'public_ip':public_ip, 'status':lb.status, 'protocol':lb.protocol, 'port':lb.port})
+    data.append({'pos': pos + 1, 'name':lb.name, 'public_ip':public_ip, 'protocol':lb.protocol, 'port':lb.port, 'status':lb.status})
   if not lbs:
     print ""
     print ""
@@ -499,8 +561,8 @@ def getCNlist():
   dfw_containers = cf_dfw.list_containers_info()
   ord_containers = cf_ord.list_containers_info()
   all_containers = dfw_containers + ord_containers
-  header = ['Container Name', 'Total Objects', 'Size', 'Region' ]
-  keys = ['name', 'total_objects', 'size', 'region' ]
+  header = ['Container Name', 'Total Objects', 'Region', 'Size' ]
+  keys = ['name', 'total_objects', 'region', 'size' ]
   sort_by_key = 'total_objects'
   sort_order_reverse = True
   #region = []
@@ -511,58 +573,21 @@ def getCNlist():
     size = byte_converter(num)
     count = cn['count']
     name = cn['name']
-    data.append({'name':name, 'size':size, 'total_objects':count, 'region':region})
+    data.append({'name':name, 'total_objects':count, 'region':region, 'size':size})
   for cn in ord_containers:
     region = 'ORD'
     num = int(cn['bytes'])
     size = byte_converter(num)
     count = cn['count']
     name = cn['name']
-    data.append({'name':name, 'size':size, 'total_objects':count, 'region':region})
+    data.append({'name':name, 'total_objects':count, 'region':region, 'size':size})
   print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
   clear_screen()
     
-# This function calls showmenu and then acts on the selected item
-def processmenu(menu, parent=None):
-  optioncount = len(menu['options'])
-  exitmenu = False
-  while not exitmenu: #Loop until the user exits the menu
-    getin = runmenu(menu, parent)
-    if getin == optioncount:
-        exitmenu = True
-    elif menu['options'][getin]['type'] == COMMAND:
-      curses.def_prog_mode()    # save curent curses environment
-      os.system('reset')
-      if menu['options'][getin]['title'] == 'Authenticate using local credentials file':
-		getcreds()
-#      os.system(menu['options'][getin]['command']) # run the command - bash
-      if menu['options'][getin]['title'] == 'Enter credentials manually':
-        input_user_creds()
-      if menu['options'][getin]['title'] == 'List Servers':
-      	serverlist()
-      if menu['options'][getin]['title'] == 'List My Images':
-        getimagelist()
-      if menu['options'][getin]['title'] == 'List Base Images':
-        getimagelist(base=True)
-      if menu['options'][getin]['title'] == 'Show Credentials':
-        show_credentials()
-      if menu['options'][getin]['title'] == 'List Load Balancers':
-        getLBlist()
-      if menu['options'][getin]['title'] == 'List Flavors':
-        flavorlist()
-      if menu['options'][getin]['title'] == 'List Cloud Files':
-        getCNlist()
-      curses.reset_prog_mode()   # reset to 'current' curses environment
-      curses.curs_set(1)         # reset doesn't do this right
-      curses.curs_set(0)
-    elif menu['options'][getin]['type'] == MENU:
-          screen.clear() #clears previous screen on key press and updates display based on pos
-          processmenu(menu['options'][getin], menu) # display the submenu
-          screen.clear() #clears previous screen on key press and updates display based on pos
-    elif menu['options'][getin]['type'] == EXITMENU:
-          exitmenu = True
+#END FUNCTIONS ^
+##################
+# MAIN PROGRAM
 
-# Main program
 try:
   processmenu(menu_data)
 except KeyboardInterrupt, e:
