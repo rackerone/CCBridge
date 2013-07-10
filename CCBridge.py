@@ -62,6 +62,8 @@ unit_list = zip(['bytes', 'kB', 'MB', 'GB', 'TB', 'PB'], [0, 0, 1, 2, 2, 2])    
 
 #set identity class
 pyrax.set_setting('identity_type', 'rackspace')
+#I can set the region here#
+#pyrax.set_setting("region", "LON") 
 
 #END GLOBAL VARIABLE SET UP ^
 ############################
@@ -118,9 +120,9 @@ menu_data = {
    'options': [
      { 'title': "Authenticate using local credentials file", 'type': COMMAND },
      { 'title': "Enter credentials manually", 'type': COMMAND },
+     { 'title': "Show Credentials", 'type': COMMAND },
    ]
    },
-   { 'title': "Show Credentials", 'type': COMMAND },
    { 'title': "List Servers", 'type': COMMAND },
    { 'title': "List Flavors", 'type': COMMAND },
    { 'title': "List Images", 'type': MENU, 'subtitle': "Please Select an Action...",
@@ -132,6 +134,7 @@ menu_data = {
    { 'title': "List Load Balancers", 'type': COMMAND },
    { 'title': "List Databases", 'type': COMMAND },
    { 'title': "List Cloud Files", 'type': COMMAND },
+   { 'title': "List DNS Records", 'type': COMMAND },
 ]
 }
 
@@ -694,7 +697,52 @@ def getLBlist():
     clear_screen()
 
 def getDBlist():
-  auth_check()
+  pass
+
+def getDNSlist():
+  print ""
+  print ""
+  myTitle('CLOUD DNS')
+  dns = pyrax.cloud_dns
+  dns_domains = dns.list()
+  #gather a list of domain names and id numbers into a list of dictionaries
+  dns_domain_names_id = []
+  for i in dns.list():
+    dns_domain_names_id.append({i.id:str(i.name)})
+  #get domain id numbers and add to a list
+  dns_idnumbers = []
+  for i in dns_domains:
+    dns_idnumbers.append(i)
+  dns_data = []
+  name_email = []
+  data = []
+  for i in dns_domains:
+    data.append({'name':i.name, 'email':i.emailAddress, 'id':str(i.id)})
+    name_email.append({'name':i.name, 'email':i.emailAddress, 'id':str(i.id)})
+  for i in dns_idnumbers:
+    dns_data.append(dns.list_records(i))
+  data = []
+  for x in range(len(dns_data)):
+    for y in range(len(dns_data[x])):
+      domainName = name_email[x]['name']
+      domainEmail = name_email[x]['email']
+      pad = '  '
+      if y == 0:
+        #print 'domain: %s, record: %s, target: %s, type: %s' % (domainName, dns_data[x][y].name, dns_data[x][y].data, dns_data[x][y].type)
+        data.append({'domain':(domainName + pad), 'dns_record':(dns_data[x][y].name + pad), 'target':(dns_data[x][y].data + pad), 'record_type':dns_data[x][y].type, 'created':(dns_data[x][y].created + pad), 'ttl':dns_data[x][y].ttl })
+      else:
+        domainName = '   --  '
+        #print 'domain: %s, record: %s, target: %s, type: %s' % (domainName, dns_data[x][y].name, dns_data[x][y].data, dns_data[x][y].type)
+        data.append({'domain':(domainName + pad), 'dns_record':(dns_data[x][y].name + pad), 'target':(dns_data[x][y].data + pad), 'record_type':dns_data[x][y].type, 'created':(dns_data[x][y].created + pad), 'ttl':dns_data[x][y].ttl })
+  header = [ 'Domain Name', 'DNS Record', '  Target  ', 'Record Type', 'Created', 'TTL' ]
+  keys = [ 'domain', 'dns_record', 'target', 'record_type', 'created', 'ttl' ]
+  #print data
+  sort_by_key = ''
+  sort_order_reverse = False
+  print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
+  
+  clear_screen()
+
 
 def getCNlist():
   print ""
@@ -807,7 +855,7 @@ def processmenu(menu, parent=None):
       curses.def_prog_mode()    # save curent curses environment
       os.system('reset')
       if menu['options'][getin]['title'] == 'Authenticate using local credentials file':
-		getcreds()
+        getcreds()
 #      os.system(menu['options'][getin]['command']) # run a bash command if necessary
       if menu['options'][getin]['title'] == 'Enter credentials manually':
         input_user_creds()
@@ -825,6 +873,8 @@ def processmenu(menu, parent=None):
         flavorlist()
       if menu['options'][getin]['title'] == 'List Cloud Files':
         getCNlist()
+      if menu['options'][getin]['title'] == 'List DNS Records':
+        getDNSlist()
       curses.reset_prog_mode()   # reset to 'current' curses environment
       curses.curs_set(1)         # reset doesn't do this right
       curses.curs_set(0)
