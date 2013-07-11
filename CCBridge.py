@@ -4,10 +4,6 @@
 # -*- coding: utf-8 -*-
 #Copyright 2013 Aaron Smith
 
-#Tested with:
-#  python 2.7.3
-#  pyrax 1.4.6
-
 #Licensed under the Apache License, Version 2.0 (the "License");
 #you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
@@ -63,11 +59,21 @@ LOG_FILE = "/var/log/CCBridge.log"
 data = []     #<---- this is a list of dictionaries.  Used with format_as_table()
 titles = []   #<---this is a list that contains the title_row ..[('x', 'y'), ('z', 'w')].  Used with format_as_table()
 unit_list = zip(['bytes', 'kB', 'MB', 'GB', 'TB', 'PB'], [0, 0, 1, 2, 2, 2])     #<-- used in bytes conversion in byte_converter()
+RACKER = False
 
 #set identity class
 pyrax.set_setting('identity_type', 'rackspace')
 #I can set the region here#
-#pyrax.set_setting("region", "LON") 
+#pyrax.set_setting("region", "LON")
+
+#Determine if user is a racker
+response = ''
+try:
+  response = urlopen("https://alerts.ohthree.com").code
+except:
+  RACKER = False
+if response == 200:
+  RACKER = True
 
 #END GLOBAL VARIABLE SET UP ^
 ############################
@@ -112,7 +118,6 @@ curses.init_pair(1,curses.COLOR_BLACK, curses.COLOR_WHITE) # Sets up color pair 
 h = curses.color_pair(1) #h is the coloring for a highlighted menu option
 n = curses.A_NORMAL #n is the coloring for a non highlighted menu option
 
-
 #END CURSES SETUP ^
 #######################
 #CREATE THE MENUS
@@ -141,7 +146,6 @@ menu_data = {
    { 'title': "List DNS Records", 'type': COMMAND },
 ]
 }
-
 
 #END CREATE MENU ^
 ############################
@@ -487,7 +491,7 @@ def cust_ddi():
 
 def getcreds():
   try:
-    #set identity class
+    #set crentials
     pyrax.set_credential_file(CREDS_FILE)
   except Exception, e:
     print ""
@@ -591,8 +595,8 @@ def serverlist():
   ord_servers = svrs_ord.servers.list()
   my_ord_servers = [svr for svr in ord_servers]
   all_servers = dfw_servers + ord_servers
-  header = ['Server Name', 'Region', 'Instance UUID', '  Public IP  ', '  Private IP  ', 'Status' ]
-  keys = ['name', 'region', 'UUID', 'public_ip', 'private_ip', 'status' ]
+  header = ['Server Name', 'Region', 'Instance UUID', '  Public IP  ', '  Private IP  ', 'Status', 'Progress', 'Created Date' ]
+  keys = ['name', 'region', 'UUID', 'public_ip', 'private_ip', 'status', 'progress', 'created' ]
   sort_by_key = 'region'
   sort_order_reverse = False
   #region = []
@@ -612,7 +616,7 @@ def serverlist():
         private_ip = ",".join(private_ip)
     #public_ip = svr.addresses['public'][0]['addr']
     #private_ip = svr.addresses['private'][0]['addr']
-    data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':svr.status})
+    data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':svr.status, 'progress':svr.progress, 'created':svr.created})
   for pos, svr in enumerate(my_ord_servers):
     region = 'ORD'
     public_ip = []
@@ -625,7 +629,7 @@ def serverlist():
       if svr.addresses['private'][i]['version'] == 4:
         private_ip.append(svr.addresses['private'][i]['addr'])
         private_ip = ",".join(private_ip)
-    data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':svr.status})
+    data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':svr.status, 'progress':svr.progress, 'created':svr.created})
   print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
   clear_screen()
 
