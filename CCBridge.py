@@ -42,6 +42,7 @@ import requests
 from urlparse import urlparse
 from urlparse import urlunparse
 import json
+from dateutil import parser     #<----dependency for time_converter()
 from operator import itemgetter
 from math import log   #<----dependency for byte_converter()
 import cgitb   #<---this provides detailed tracebacks on error 
@@ -66,7 +67,7 @@ pyrax.set_setting('identity_type', 'rackspace')
 #I can set the region here#
 #pyrax.set_setting("region", "LON")
 
-#Determine if user is a racker
+#Determine if user is a racker.  Necessary of using the OhThree() class to scrape server info.
 response = ''
 try:
   response = urlopen("https://alerts.ohthree.com").code
@@ -341,7 +342,14 @@ def byte_converter(num):
     return '0 bytes'
   if num == 1:
     return '1 byte'
-    
+
+def time_converter(cloud_time):
+  """This will accept the creation time of cloud products and convert to a
+  more user-friendly format.  Sample return is 'Fri May  3 14:33:24 2013'
+  """
+  dt = parser.parse(cloud_time)
+  return dt.ctime()
+  
 def requests(url):
   response = requests.get(url=url, verify=False)
   assert response.status_code == 200
@@ -584,6 +592,9 @@ def flavorlist():
 def serverlist():
   print ""
   print ""
+  #from dateutil import parser
+  #dt = parser.parse(svr.created)
+  #server formated 'created 'time is dt.ctime() .  Sample format is 'Fri May  3 14:33:24 2013'
   myTitle('CLOUD SERVERS')
   cs = pyrax.cloudservers  #use cs.servers.list()
   svrs = cs.servers.list()
@@ -616,7 +627,7 @@ def serverlist():
         private_ip = ",".join(private_ip)
     #public_ip = svr.addresses['public'][0]['addr']
     #private_ip = svr.addresses['private'][0]['addr']
-    data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':svr.status, 'progress':svr.progress, 'created':svr.created})
+    data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':svr.status, 'progress':svr.progress, 'created':time_converter(svr.created)})
   for pos, svr in enumerate(my_ord_servers):
     region = 'ORD'
     public_ip = []
@@ -629,7 +640,7 @@ def serverlist():
       if svr.addresses['private'][i]['version'] == 4:
         private_ip.append(svr.addresses['private'][i]['addr'])
         private_ip = ",".join(private_ip)
-    data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':svr.status, 'progress':svr.progress, 'created':svr.created})
+    data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':svr.status, 'progress':svr.progress, 'created':time_converter(svr.created)})
   print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
   clear_screen()
 
