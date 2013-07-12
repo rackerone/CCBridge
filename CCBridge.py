@@ -366,60 +366,60 @@ def requests(url):
   print response.json()
 
 def format_as_table(data, keys, header=None, sort_by_key=None, sort_order_reverse=False):
-    """Takes a list of dictionaries, formats the data, and returns
-    the formatted data as a text table.
+  """Takes a list of dictionaries, formats the data, and returns
+  the formatted data as a text table.
 
-    Required Parameters:
-        data - Data to process (list of dictionaries). (Type: List)
-        keys - List of keys in the dictionary. (Type: List)
+  Required Parameters:
+    data - Data to process (list of dictionaries). (Type: List)
+    keys - List of keys in the dictionary. (Type: List)
 
-    Optional Parameters:
-        header - The table header. (Type: List)
-        sort_by_key - The key to sort by. (Type: String)
-        sort_order_reverse - Default sort order is ascending, if
-            True sort order will change to descending. (Type: Boolean)
-    """
-    # Sort the data if a sort key is specified (default sort order
-    # is ascending)
-    if sort_by_key:
-        data = sorted(data,
-                      key=itemgetter(sort_by_key),
-                      reverse=sort_order_reverse)
+  Optional Parameters:
+    header - The table header. (Type: List)
+    sort_by_key - The key to sort by. (Type: String)
+    sort_order_reverse - Default sort order is ascending, if
+      True sort order will change to descending. (Type: Boolean)
+  """
+  # Sort the data if a sort key is specified (default sort order
+  # is ascending)
+  if sort_by_key:
+    data = sorted(data,
+                  key=itemgetter(sort_by_key),
+                  reverse=sort_order_reverse)
 
-    # If header is not empty, add header to data
-    if header:
-        # Get the length of each header and create a divider based
-        # on that length
-        header_divider = []
-        for name in header:
-            header_divider.append('-' * len(name))
+  # If header is not empty, add header to data
+  if header:
+    # Get the length of each header and create a divider based
+    # on that length
+    header_divider = []
+    for name in header:
+      header_divider.append('-' * len(name))
 
-        # Create a list of dictionary from the keys and the header and
-        # insert it at the beginning of the list. Do the same for the
-        # divider and insert below the header.
-        header_divider = dict(zip(keys, header_divider))
-        data.insert(0, header_divider)
-        header = dict(zip(keys, header))
-        data.insert(0, header)
+    # Create a list of dictionary from the keys and the header and
+    # insert it at the beginning of the list. Do the same for the
+    # divider and insert below the header.
+    header_divider = dict(zip(keys, header_divider))
+    data.insert(0, header_divider)
+    header = dict(zip(keys, header))
+    data.insert(0, header)
 
-    column_widths = []
-    for key in keys:
-        column_widths.append(max(len(str(column[key])) for column in data))
+  column_widths = []
+  for key in keys:
+    column_widths.append(max(len(str(column[key])) for column in data))
 
-    # Create a tuple pair of key and the associated column width for it
-    key_width_pair = zip(keys, column_widths)
+  # Create a tuple pair of key and the associated column width for it
+  key_width_pair = zip(keys, column_widths)
 
-    format = ('%-*s ' * len(keys)).strip() + '\n'
-    formatted_data = ''
-    for element in data:
-        data_to_format = []
-        # Create a tuple that will be used for the formatting in
-        # width, value format
-        for pair in key_width_pair:
-            data_to_format.append(pair[1])
-            data_to_format.append(element[pair[0]])
-        formatted_data += format % tuple(data_to_format)
-    return formatted_data
+  format = ('%-*s ' * len(keys)).strip() + '\n'
+  formatted_data = ''
+  for element in data:
+    data_to_format = []
+    # Create a tuple that will be used for the formatting in
+    # width, value format
+    for pair in key_width_pair:
+      data_to_format.append(pair[1])
+      data_to_format.append(element[pair[0]])
+    formatted_data += format % tuple(data_to_format)
+  return formatted_data
 
 def myTitle(title):
   """This is the header/title.  Pass a string as title.  This title occupies full terminal width"""
@@ -816,13 +816,13 @@ def runmenu(menu, parent):
     lastoption = "Exit"
   else:
     lastoption = "Return to %s menu" % parent['title']
- 
+  
   optioncount = len(menu['options']) # how many options in this menu
- 
+  
   pos=0 #pos is the zero-based index of the hightlighted menu option. Every time runmenu is called, position returns to 0, when runmenu ends the position is returned and tells the program what opt$
   oldpos=None # used to prevent the screen being redrawn every time
   x = None #control for while loop, let's you scroll through options until return key is pressed then returns pos to program
- 
+  
   # Loop until return key is pressed
   while x !=ord('\n'):
     if pos != oldpos:
@@ -830,7 +830,7 @@ def runmenu(menu, parent):
       screen.border(0)
       screen.addstr(2,2, menu['title'], curses.A_STANDOUT) # Title for this menu
       screen.addstr(4,2, menu['subtitle'], curses.A_BOLD) #Subtitle for this menu
- 
+  
       # Display all the menu items, showing the 'pos' item highlighted
       for index in range(optioncount):
         textstyle = n
@@ -844,9 +844,9 @@ def runmenu(menu, parent):
       screen.addstr(5+optioncount,4, "%d - %s" % (optioncount+1, lastoption), textstyle)
       screen.refresh()
       # finished updating screen
- 
+  
     x = screen.getch() # Gets user input
- 
+  
     # What is user input?
     if x >= ord('1') and x <= ord(str(optioncount+1)):
       pos = x - ord('0') - 1 # convert keypress back to a number, then subtract 1 to get index
@@ -858,7 +858,7 @@ def runmenu(menu, parent):
       if pos > 0:
         pos += -1
       else: pos = optioncount
- 
+  
   # return index of the selected item
   return pos
 
