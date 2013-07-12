@@ -25,10 +25,10 @@ todo:
 -add 'total objects' and 'total cloud files space consumed'
 -if no servers, print "no servers" instead of blank table
 - show the X-Storage-URL...see below
-$ curl -D - -H"X-Auth-User: concepsydney" -H"X-Auth-Key: 3170c4339534658be85517fe3f67a036" https://auth.api.rackspacecloud.com/v1.0HTTP/1.1 204 No Content
+$ curl -D - -H"X-Auth-User: USERNAME" -H"X-Auth-Key: USERAUTHKEY" https://auth.api.rackspacecloud.com/v1.0HTTP/1.1 204 No Content
 Server: nginx/0.8.55
 vary: Accept, Accept-Encoding, X-Auth-Token, X-Auth-Key, X-Storage-User, X-Storage-Pass, X-Auth-User
-X-Storage-Url: https://storage101.dfw1.clouddrive.com/v1/MossoCloudFS_cd37bf46-827c-494d-921e-8a5dafeec42b
+X-Storage-Url: https://storage101.dfw1.clouddrive.com/v1/MossoCloudFS_cefef46-827c-8fi3-921e-8a5dafeec42b
 """
 
  
