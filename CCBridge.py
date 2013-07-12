@@ -320,11 +320,6 @@ class OhThree():
     print ""
     print ""
 
-
-#END CLASSES ^^
-############################
-#FUNCTIONS
-
 def terminal_size():
   """Get the terminal row and column length for building fit-to-screen content"""
   rows, cols = os.popen('stty size', 'r').read().split()
@@ -493,10 +488,14 @@ def name():
   customer_username = pyrax.identity.username
   print "Username: %s" % customer_username
 
-def cust_ddi():
-  tennant_ddi = pyrax.identity.tenant_id
-  print "DDI: %s" % tennant_ddi
-
+def tenant_ID():
+  #tenant_ID = ddi number
+  ddi = pyrax.identity.tenant_id
+  return ddi
+  
+def print_cust_ddi():
+  print "DDI: %s" % tenant_ID()
+  
 def getcreds():
   try:
     #set crentials
@@ -518,7 +517,7 @@ def getcreds():
     token()
     expires()
     default_region()
-    cust_ddi()
+    print_cust_ddi()
     clear_screen()
 
 def services():
@@ -537,7 +536,7 @@ def input_user_creds():
   print ""
   print "Authentication successful: %s" % auth_successful
   name()
-  cust_ddi()
+  print_cust_ddi()
   token()
   expires()
   default_region()
@@ -562,7 +561,7 @@ def show_credentials():
     print ""
     print ""
     name()
-    cust_ddi()
+    print_cust_ddi()
     #get_API_key()
     token()
     expires()
@@ -666,8 +665,9 @@ def getimagelist(base=False):
     clear_screen()
   my_dfw_images = [img for img in dfw_images if hasattr(img, "server")]
   my_ord_images = [img for img in ord_images if hasattr(img, "server")]
+  #create list named data (or delete contents if exists).  This list used as input for format_as_table()
+  data = []
   if base:
-    data = []
     header = ['Image Name', 'Image ID']
     keys = ['name', 'ID']
 #    sor_by_key = 'name'
@@ -677,7 +677,6 @@ def getimagelist(base=False):
     print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
     clear_screen()
   else:
-    data = []
     header = ['Image Name', 'Region', 'Image ID', 'Min RAM', 'Min Disk', 'Status', 'Progress' ]
     keys = ['name', 'region', 'ID', 'minram', 'mindisk', 'status', 'progress' ]
  #   sort_by_key = 'region'
@@ -700,6 +699,7 @@ def getLBlist():
   keys = [ 'name', 'public_ip', 'protocol', 'port', 'status' ]
   sort_by_key = 'status'
   sort_order_reverse = False
+  #create list named data (or delete contents if exists).  This list used as input for format_as_table()
   data = []
   for pos, lb in enumerate(lbs):
     public_ip = lb.virtual_ips[0].address
@@ -723,36 +723,55 @@ def getDNSlist():
   print ""
   myTitle('CLOUD DNS')
   dns = pyrax.cloud_dns
+  
+  #Save DNS domains into list
   dns_domains = dns.list()
+
   #gather a list of domain names and id numbers into a list of dictionaries
   dns_domain_names_id = []
   for i in dns.list():
     dns_domain_names_id.append({i.id:str(i.name)})
-  #get domain id numbers and add to a list
+
+  #Using the list dns_domains, gather list if domain ID numbers for later use
   dns_idnumbers = []
   for i in dns_domains:
     dns_idnumbers.append(i)
-  dns_data = []
+
+  #Create list named name_email and append dictionaries comprised of domain name, administrator email address, and the domain ID
   name_email = []
-  data = []
   for i in dns_domains:
-    data.append({'name':i.name, 'email':i.emailAddress, 'id':str(i.id)})
     name_email.append({'name':i.name, 'email':i.emailAddress, 'id':str(i.id)})
+
+  #Create a list named dns_data and append dictionaries containing all DNS data to be parsed
+  dns_data = []
   for i in dns_idnumbers:
     dns_data.append(dns.list_records(i))
+
+  #create list named data (or delete contents if exists).  This list used as input for format_as_table()
   data = []
+  #-->For every root domain name in the list dns_data...
   for x in range(len(dns_data)):
+    #-->For every DNS record within each root domain...
     for y in range(len(dns_data[x])):
+      #Save root domain name as domainName
       domainName = name_email[x]['name']
+      #Save administrator email as domainEmail
       domainEmail = name_email[x]['email']
+      #this variable 'pad' is used to pad data with spacces for formatting
       pad = '  '
+      
+      #If the dns record is the first in the list - or record 0- then use actual domain name in table column
       if y == 0:
-        #print 'domain: %s, record: %s, target: %s, type: %s' % (domainName, dns_data[x][y].name, dns_data[x][y].data, dns_data[x][y].type)
+        #Append information to the list 'data' to be used in format_as_table()
         data.append({'domain':(domainName + pad), 'dns_record':(dns_data[x][y].name + pad), 'target':(dns_data[x][y].data + pad), 'record_type':dns_data[x][y].type, 'created':(dns_data[x][y].created + pad), 'ttl':dns_data[x][y].ttl })
+      #Now every other DNS record within this root domain will have just 2 dashes in the domain name table column
       else:
+        #set domain name table column to 2 dashes
         domainName = '   --  '
-        #print 'domain: %s, record: %s, target: %s, type: %s' % (domainName, dns_data[x][y].name, dns_data[x][y].data, dns_data[x][y].type)
+        #Append information to the list 'data' to be used in format_as_table()
         data.append({'domain':(domainName + pad), 'dns_record':(dns_data[x][y].name + pad), 'target':(dns_data[x][y].data + pad), 'record_type':dns_data[x][y].type, 'created':(dns_data[x][y].created + pad), 'ttl':dns_data[x][y].ttl })
+  
+  #Set up table varaibles and print table
   header = [ 'Domain Name', 'DNS Record', '  Target  ', 'Record Type', 'Created', 'TTL' ]
   keys = [ 'domain', 'dns_record', 'target', 'record_type', 'created', 'ttl' ]
   #print data
@@ -760,27 +779,36 @@ def getDNSlist():
   sort_order_reverse = False
   print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
   
+  #call clear_screen() to reset the terminal
   clear_screen()
 
-
 def getCNlist():
+  #print space buffer at top of terminal for formatting purposes
   print ""
   print ""
+  
+  #Draw title bar with string included
   myTitle('CLOUD FILES')
-  cfiles = pyrax.cloudfiles  #use cs.servers.list()
-  #connect to cloud files by region
+  
+  #create a connection to cloud files for later use if necessary
+  cfiles = pyrax.cloudfiles
+  
+  #Connect to cloud files by region and create a list of containers in each region.
   cf_ord = pyrax.connect_to_cloudfiles(region='ORD')
   cf_dfw = pyrax.connect_to_cloudfiles(region='DFW')
   dfw_containers = cf_dfw.list_containers_info()
   ord_containers = cf_ord.list_containers_info()
+  
+  #All containers combined into one list
   all_containers = dfw_containers + ord_containers
-  header = ['Container Name', 'Total Objects', 'Region', 'Size' ]
-  keys = ['name', 'total_objects', 'region', 'size' ]
-  sort_by_key = 'total_objects'
-  sort_order_reverse = True
-  #region = []
-  data = []
+  
+  #Capture a running total count of all containers combined
   total_obj = 0
+  
+  #create list named data (or delete contents if exists).  This list used as input for format_as_table()
+  data = []
+  
+  #Gather a list of dfw containers and append them to the list named data
   for cn in dfw_containers:
     region = 'DFW'
     num = int(cn['bytes'])
@@ -788,8 +816,11 @@ def getCNlist():
     count = cn['count']
     name = cn['name']
     data.append({'name':name, 'total_objects':count, 'region':region, 'size':size})
+    
+    #Increment total_obj by the number of objects in the current container
     total_obj += count
     
+  #Gather a list of ord containers and append them to the list named data
   for cn in ord_containers:
     region = 'ORD'
     num = int(cn['bytes'])
@@ -797,11 +828,23 @@ def getCNlist():
     count = cn['count']
     name = cn['name']
     data.append({'name':name, 'total_objects':count, 'region':region, 'size':size})
+    
+    #Increment total_obj by the number of objects in the current container
     total_obj += count
-  print "I have %d total objects in my account!" % total_obj
-  print ""
-  print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
   
+  #Set up table varaibles and print table
+  header = ['Container Name', 'Total Objects', 'Region', 'Size' ]
+  keys = ['name', 'total_objects', 'region', 'size' ]
+  sort_by_key = 'total_objects'
+  sort_order_reverse = True
+  print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
+  print ""
+  print ""
+  print "Total number of objects in cloud files for account number %s ===>  +%s Objects" % (tenant_ID(), total_obj)
+  print ""
+  print ""
+  
+  #Call clear_screen() to reset the terminal
   clear_screen()
     
 #END FUNCTIONS ^
@@ -861,7 +904,6 @@ def runmenu(menu, parent):
   
   # return index of the selected item
   return pos
-
 
 def processmenu(menu, parent=None):
   optioncount = len(menu['options'])
