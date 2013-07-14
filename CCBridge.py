@@ -19,10 +19,11 @@
 """
 todo:
 -add disk size, and used space to server list
--add flavor to server list
--add os to server list
+-add flavor/ram/os to server list
+-add support for cloud backup (show activity)
+-add support for cloud monitoring
 -add exception (AuthenticationError) to authenticate
--add 'total objects' and 'total cloud files space consumed'
+-add 'total cloud files space consumed'    <---DONE
 -if no servers, print "no servers" instead of blank table
 - show the X-Storage-URL...see below
 $ curl -D - -H"X-Auth-User: USERNAME" -H"X-Auth-Key: USERAUTHKEY" https://auth.api.rackspacecloud.com/v1.0HTTP/1.1 204 No Content
@@ -489,11 +490,12 @@ def name():
   print "Username: %s" % customer_username
 
 def tenant_ID():
-  #tenant_ID = ddi number
+  """Return customer DDI number, also referred to as tenant_id"""
   ddi = pyrax.identity.tenant_id
   return ddi
   
 def print_cust_ddi():
+  """When formatting screen with credential details, use this to return nice string containing DDI"""
   print "DDI: %s" % tenant_ID()
   
 def getcreds():
@@ -589,12 +591,15 @@ def flavorlist():
   clear_screen()
 
 def serverlist():
+  """Use to create a table containing list of servers by region.  This list will contain server details formatted
+  nicely"""
   print ""
   print ""
-  #from dateutil import parser
-  #dt = parser.parse(svr.created)
-  #server formated 'created 'time is dt.ctime() .  Sample format is 'Fri May  3 14:33:24 2013'
+  #Draw title bar with included string
   myTitle('CLOUD SERVERS')
+  
+  #Create connection to cloud servers and get list of servers.  Also set up
+  # various variables for server iteration.  Seperate lists by region.
   cs = pyrax.cloudservers  #use cs.servers.list()
   svrs = cs.servers.list()
   my_servers = [svr for svr in svrs]
@@ -605,12 +610,11 @@ def serverlist():
   ord_servers = svrs_ord.servers.list()
   my_ord_servers = [svr for svr in ord_servers]
   all_servers = dfw_servers + ord_servers
-  header = ['Server Name', 'Region', 'Instance UUID', '  Public IP  ', '  Private IP  ', 'Status', 'Progress', 'Created Date' ]
-  keys = ['name', 'region', 'UUID', 'public_ip', 'private_ip', 'status', 'progress', 'created' ]
-  sort_by_key = 'region'
-  sort_order_reverse = False
-  #region = []
+  
+  #Create list named 'data' to be used for table input
   data = []
+  
+  #Iterate servers by region and append to server details to 'data'.
   status = ''
   for pos, svr in enumerate(my_dfw_servers):
     region = 'DFW'
@@ -624,8 +628,6 @@ def serverlist():
       if svr.addresses['private'][i]['version'] == 4:
         private_ip.append(svr.addresses['private'][i]['addr'])
         private_ip = ",".join(private_ip)
-    #public_ip = svr.addresses['public'][0]['addr']
-    #private_ip = svr.addresses['private'][0]['addr']
     data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':svr.status, 'progress':svr.progress, 'created':time_converter(svr.created)})
   for pos, svr in enumerate(my_ord_servers):
     region = 'ORD'
@@ -640,46 +642,80 @@ def serverlist():
         private_ip.append(svr.addresses['private'][i]['addr'])
         private_ip = ",".join(private_ip)
     data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':svr.status, 'progress':svr.progress, 'created':time_converter(svr.created)})
+  
+  #Set up table variables and print table
+  header = ['Server Name', 'Region', 'Instance UUID', '  Public IP  ', '  Private IP  ', 'Status', 'Progress', 'Created Date' ]
+  keys = ['name', 'region', 'UUID', 'public_ip', 'private_ip', 'status', 'progress', 'created' ]
+  sort_by_key = 'region'
+  sort_order_reverse = False
   print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
   clear_screen()
 
 def getimagelist(base=False):
+  """Interact with images using this function.  Passing base=True will print base images from Rackspace.
+  Leaving base=false will return your saved images and NOT base images from Rackspace.
+  """
   print ""
   print ""
+  #Draw title bar with included string
   myTitle('MY IMAGES')
-  ## Print list of available images with imageID
+  
+  #Create connection to cloud servers
   cs = pyrax.cloudservers
+  
+  #Create base image list
   all_base_images = cs.images.list()
   base_images = [img for img in all_base_images if not hasattr(img, "server")]
+  
+  #Create connection to cloud servers with region set to DFW
   svrs_dfw = pyrax.connect_to_cloudservers(region="DFW")
+  
+  #Create connection to cloud servers with region set to ORD
   svrs_ord = pyrax.connect_to_cloudservers(region="ORD")
+  
+  #Create list images for DFW and ORD, respectively
   dfw_images = svrs_dfw.images.list()
   ord_images = svrs_ord.images.list()
+  
+  #Gather all images together into one object named 'all_images'
   all_imgs = dfw_images + ord_images
+  
+  #Create iterable list object of all images with the attribute 'server', which means it is
+  # a saved image and not a base image from Rackspace
   images = [img for img in all_imgs if hasattr(img, "server")]
   sort_by_key = ''
+  
+  #If no saved images then do not print table.  Print message instead
   if not images:
     print ""
     print ""
     print "You have no images!"
     clear_screen()
+    
+  #Create iterable list of saved images (not base) in DFW and ORD, respectively
   my_dfw_images = [img for img in dfw_images if hasattr(img, "server")]
   my_ord_images = [img for img in ord_images if hasattr(img, "server")]
+  
+  
   #create list named data (or delete contents if exists).  This list used as input for format_as_table()
   data = []
+  
+  #If base=True then set up table to print base Rackspace images
   if base:
+    #Create table variables
     header = ['Image Name', 'Image ID']
     keys = ['name', 'ID']
-#    sor_by_key = 'name'
+    #sor_by_key = 'name'
     sort_order_reverse = False
     for img in base_images:
       data.append({'name':img.name, 'ID':img.id})
     print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
     clear_screen()
   else:
+    #If base=False (default) then set up table to print saved iamges
     header = ['Image Name', 'Region', 'Image ID', 'Min RAM', 'Min Disk', 'Status', 'Progress' ]
     keys = ['name', 'region', 'ID', 'minram', 'mindisk', 'status', 'progress' ]
- #   sort_by_key = 'region'
+    #sort_by_key = 'region'
     sort_order_reverse = False
     for pos,img in enumerate(my_dfw_images):
       region = 'DFW'
@@ -691,19 +727,32 @@ def getimagelist(base=False):
     clear_screen()
 
 def getLBlist():
+  print ""
+  print ""
+  #Print title bar with lincluded string
   myTitle('MY LOAD BALANCERS')
+  
+  #Create connection to cloud load balancers
   lb = pyrax.cloud_loadbalancers
+  
+  #Capture all load balancers in an object
   all_lbs = lb.list()
+  
+  #Create iterable object 'lbs' containing list of load balancers
   lbs = [loadb for loadb in all_lbs]
-  header = [ 'Load Balancer Name', '  IP Address  ', 'Protocol', 'Port', 'Status' ]
-  keys = [ 'name', 'public_ip', 'protocol', 'port', 'status' ]
-  sort_by_key = 'status'
-  sort_order_reverse = False
+  
   #create list named data (or delete contents if exists).  This list used as input for format_as_table()
   data = []
   for pos, lb in enumerate(lbs):
     public_ip = lb.virtual_ips[0].address
     data.append({'pos': pos + 1, 'name':lb.name, 'public_ip':public_ip, 'protocol':lb.protocol, 'port':lb.port, 'status':lb.status})
+  
+  #Set up table varaibles
+  header = [ 'Load Balancer Name', '  IP Address  ', 'Protocol', 'Port', 'Status' ]
+  keys = [ 'name', 'public_ip', 'protocol', 'port', 'status' ]
+  sort_by_key = 'status'
+  sort_order_reverse = False
+  #If no load balancers exist don't print table, else print table with data
   if not lbs:
     print ""
     print ""
@@ -721,13 +770,16 @@ def getDBlist():
 def getDNSlist():
   print ""
   print ""
+  #Draw title line with string cincluded
   myTitle('CLOUD DNS')
+  
+  #Create connection to cloud DNS
   dns = pyrax.cloud_dns
   
   #Save DNS domains into list
   dns_domains = dns.list()
 
-  #gather a list of domain names and id numbers into a list of dictionaries
+  #Gather a list of domain names and id numbers into a list of dictionaries
   dns_domain_names_id = []
   for i in dns.list():
     dns_domain_names_id.append({i.id:str(i.name)})
@@ -805,32 +857,41 @@ def getCNlist():
   #Capture a running total count of all containers combined
   total_obj = 0
   
-  #create list named data (or delete contents if exists).  This list used as input for format_as_table()
-  data = []
+  #Initialize variable named total_bytes to capture a running total count of all bytes used in cloud files
+  total_bytes = 0
   
+  #Create list named data (or delete contents if exists).  This list used as input for format_as_table()
+  data = []
+
   #Gather a list of dfw containers and append them to the list named data
   for cn in dfw_containers:
     region = 'DFW'
-    num = int(cn['bytes'])
-    size = byte_converter(num)
+    number_bytes = int(cn['bytes'])
+    size = byte_converter(number_bytes)
     count = cn['count']
     name = cn['name']
     data.append({'name':name, 'total_objects':count, 'region':region, 'size':size})
     
     #Increment total_obj by the number of objects in the current container
     total_obj += count
+    
+    #Increment total_bytes by the number of bytes in variable 'number_bytes'
+    total_bytes += number_bytes
     
   #Gather a list of ord containers and append them to the list named data
   for cn in ord_containers:
     region = 'ORD'
-    num = int(cn['bytes'])
-    size = byte_converter(num)
+    number_bytes = int(cn['bytes'])
+    size = byte_converter(number_bytes)
     count = cn['count']
     name = cn['name']
     data.append({'name':name, 'total_objects':count, 'region':region, 'size':size})
     
     #Increment total_obj by the number of objects in the current container
     total_obj += count
+    
+    #Increment total_bytes by the number of bytes in variable 'number_bytes'
+    total_bytes += number_bytes
   
   #Set up table varaibles and print table
   header = ['Container Name', 'Total Objects', 'Region', 'Size' ]
@@ -840,7 +901,8 @@ def getCNlist():
   print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
   print ""
   print ""
-  print "Total number of objects in cloud files for account number %s ===>  +%s Objects" % (tenant_ID(), total_obj)
+  print "Total Objects = %s " % total_obj
+  print "Total Space Consumed = %s" % byte_converter(total_bytes)
   print ""
   print ""
   
@@ -892,7 +954,8 @@ def runmenu(menu, parent):
   
     # What is user input?
     if x >= ord('1') and x <= ord(str(optioncount+1)):
-      pos = x - ord('0') - 1 # convert keypress back to a number, then subtract 1 to get index
+      # convert keypress back to a number, then subtract 1 to get index
+      pos = x - ord('0') - 1 
     elif x == 258: # down arrow
       if pos < optioncount:
         pos += 1
@@ -911,13 +974,13 @@ def processmenu(menu, parent=None):
   while not exitmenu: #Loop until the user exits the menu
     getin = runmenu(menu, parent)
     if getin == optioncount:
-        exitmenu = True
+      exitmenu = True
     elif menu['options'][getin]['type'] == COMMAND:
       curses.def_prog_mode()    # save curent curses environment
       os.system('reset')
       if menu['options'][getin]['title'] == 'Authenticate using local credentials file':
         getcreds()
-#      os.system(menu['options'][getin]['command']) # run a bash command if necessary
+      #os.system(menu['options'][getin]['command']) # run a bash command if necessary
       if menu['options'][getin]['title'] == 'Enter credentials manually':
         input_user_creds()
       if menu['options'][getin]['title'] == 'List Servers':
@@ -936,15 +999,19 @@ def processmenu(menu, parent=None):
         getCNlist()
       if menu['options'][getin]['title'] == 'List DNS Records':
         getDNSlist()
-      curses.reset_prog_mode()   # reset to 'current' curses environment
-      curses.curs_set(1)         # reset doesn't do this right
+      # reset to 'current' curses environment
+      curses.reset_prog_mode()
+      # reset doesn't do this right
+      curses.curs_set(1)
       curses.curs_set(0)
     elif menu['options'][getin]['type'] == MENU:
-          screen.clear() #clears previous screen on key press and updates display based on pos
-          processmenu(menu['options'][getin], menu) # display the submenu
-          screen.clear() #clears previous screen on key press and updates display based on pos
+      #clears previous screen on key press and updates display based on pos
+      screen.clear() 
+      processmenu(menu['options'][getin], menu) # display the submenu
+      #clears previous screen on key press and updates display based on pos
+      screen.clear()
     elif menu['options'][getin]['type'] == EXITMENU:
-          exitmenu = True
+      exitmenu = True
 
 #Execute program
 # This function calls showmenu and then acts on the selected item
