@@ -18,11 +18,17 @@
 
 """
 todo:
--add disk size, and used space to server list
--add flavor/ram/os to server list
+-install https://github.com/justinsb/python-novatools.git for first generation server support
+-add disk size, and used space to server list   alerts.ohthree.com  (get allocated from "root_gb": 160,  in reports.ohthree.com)
+-add flavor/ram/os/vcpu to server list   reports.ohthree.com
 -add support for cloud backup (show activity)
 -add support for cloud monitoring
 -add exception (AuthenticationError) to authenticate
+-When using tool on RACKER network, verify host names match --name using pyrax and "vm-data/hostname" from ohthree.
+  This will be a good mechanism to find flag potentials errors.  I have found cases where names differ.  I believe
+  the pyrax-found name is correct and the "vm-data/hostname" found name is possibly incorrect.  VM-data is found using
+  ohthree API and pulled from xenstore database.  This database entry could be incorrect but still investigating.
+  Test with 7744cc2f-f4e1-4c3b-8003-1c72f6339d4c
 -add 'total cloud files space consumed'    <---DONE
 -if no servers, print "no servers" instead of blank table
 - show the X-Storage-URL...see below
@@ -46,7 +52,8 @@ import json
 from dateutil import parser     #<----dependency for time_converter()
 from operator import itemgetter
 from math import log   #<----dependency for byte_converter()
-import cgitb   #<---this provides detailed tracebacks on error 
+import cgitb   #<---this provides detailed tracebacks on error
+import pdb   #<---python debugger - insert pdb.set_trace()
 
 #enable detailed tracebacks
 cgitb.enable(format='text')
@@ -68,14 +75,17 @@ pyrax.set_setting('identity_type', 'rackspace')
 #I can set the region here#
 #pyrax.set_setting("region", "LON")
 
-#Determine if user is a racker.  Necessary of using the OhThree() class to scrape server info.
-response = ''
+
+#Determine if user is a racker, or more specifically, if currently operating on the Rackspace internal network.  Necessary if
+# using the OhThree() class to scrape server info.
+status_code = ''
 try:
-  response = urlopen("https://alerts.ohthree.com").code
+  status_code = urlopen("https://alerts.ohthree.com").code
 except:
   RACKER = False
-if response == 200:
+if status_code == 200:
   RACKER = True
+
 
 #END GLOBAL VARIABLE SET UP ^
 ############################
@@ -171,8 +181,9 @@ class URLBuilder( object ):
     return urlunparse( self.parts )
 
 class OhThree():
-  """This class will be used to interact with the https://alerts.ohthree.com API """
-  #url = 'alerts.ohthree.com'
+  """This class will be used to interact with the https://alerts.ohthree.com API.  Also, we will
+  use to scrape https://reports.ohthree.com for instance information not available in alerts.ohthree.com
+  """
   def __init__(self, target, type=None, path=None, url='alerts.ohthree.com'):
     """Initialize where type is an available api endpoint.
     type = [vminfo|hosts|glanceprocess|network_diagnostic|tcpdump]
@@ -190,7 +201,16 @@ class OhThree():
     self.target = target
     self.path = path
     self.url = url
-    
+  
+  def getResponse(self):
+    """Return the json response of the URL of the target instance."""
+    mypath = [self.path, self.type, self.target]
+    joined_path = '/'.join(mypath)
+    initialize_url = URLBuilder('')
+    vm_url = initialize_url(scheme='https', netloc=self.url, path=joined_path)
+    response = my_Requests(vm_url)
+    return response
+
   def getType(self):
     """Return type - default value is 'vminfo'.  This could also be 'hosts',
     'glanceprocess', 'network_diagnostic', 'tcpdump' if set explicitly"""
@@ -204,49 +224,89 @@ class OhThree():
     """Return the path portion of the url.  This will be always be 'api', which
     is the default value."""
     return self.path
-    
-  def getVMinfo(self):
-    """Returns general instance information, a networking table displaying all 
-    public and private networks (IPv4), and a VDI chain information"""
-    os.system('cls' if os.name=='nt' else 'clear')
-    mypath = [self.path, self.type, self.target]
-    joined_path = '/'.join(mypath)
-    initialize_url = URLBuilder('')
-    vm_url = initialize_url(scheme='https', netloc=self.url, path=joined_path)
-    response = my_Requests(vm_url)
-    vm_virt_size = byte_converter(int(response.json()['vm_info']['vdi_list'][0]['virtual_size']))
-    vm_phy_size = byte_converter(int(response.json()['vm_info']['vdi_list'][0]['phy_utilization']))
-    my_storage_repository = response.json()['vm_info']['sr_uuid']
-    my_power_state = response.json()['vm_info']['power_state']
-    my_name_label = response.json()['vm_info']['name_label']
-    my_dom_id = response.json()['vm_info']['dom_id']
-    my_cell = response.json()['cell']
-    my_vdi_list = response.json()['vm_info']['vdi_list']
-    my_server_name = response.json()['vm_info']['xenstore_data']['vm-data/hostname']
-    
-    #Print general information about the server instance
-    myTitle('General Instance Information')
-    print "Server Name: %s" % my_server_name
-    print "Name Label: %s" % my_name_label
-    print "Cell: %s" % my_cell
-    print "Power State: %s" % my_power_state
-    print "dom-id: %s" % my_dom_id
-    print "SR: %s" % my_storage_repository
-    #print "My Networks: %s" % mynetworks
-    print ""
-    print ""
-    
-    #Print networking information in table format
-    myTitle('Networking')
-    my_networking_dict = response.json()['vm_info']['xenstore_data']
-    my_networking_keys = my_networking_dict.keys()
-    mynetworks = []
+  
+  def getPowerState(self):
+    r = self.getResponse()
+    my_power_state = r.json()['vm_info']['power_state']
+    return my_power_state
+  
+  def getVDIList(self):
+    """Return dictionaries containing VDI chain details.
+    """
+    r = self.getResponse()
+    my_vdi_list = r.json()['vm_info']['vdi_list']
+    return my_vdi_list
+
+  def getDiskSize(self):
+    r = self.getResponse()
+    pass
+
+  def getPhysicalUtilization(self):
+    r = self.getResponse()
+    pass
+  
+  #def getVirtualSize(self):
+  #  vm_virt_size = byte_converter(int(response.json()['vm_info']['vdi_list'][0]['virtual_size']))
+  #  return vm_virt_size
+  #
+  #def getPhysicalSize(self):
+  #  vm_phy_size = byte_converter(int(response.json()['vm_info']['vdi_list'][0]['phy_utilization']))
+  #  return vm_phy_size
+  
+  def getDomId(self):
+    r = self.getResponse()
+    my_dom_id = r.json()['vm_info']['dom_id']
+    return my_dom_id
+  
+  def getCell(self):
+    r = self.getResponse()
+    my_cell = r.json()['cell']
+    return my_cell
+  
+  def getServerName(self):
+    r = self.getResponse()
+    my_server_name = r.json()['vm_info']['xenstore_data']['vm-data/hostname']
+    return my_server_name
+  
+  def getNameLabel(self):
+    r = self.getResponse()
+    my_name_label = r.json()['vm_info']['name_label']
+    return my_name_label
+  
+  def getStorageRepository(self):
+    r = self.getResponse()
+    my_storage_repository = r.json()['vm_info']['sr_uuid']
+    return my_storage_repository
+  
+  def getNetworkingDict(self):
+    """Returns dictionary of network data about instance.
+    """
+    r = self.getResponse()
+    dict = r.json()['vm_info']['xenstore_data']
+    return dict
+
+  def getNetworkingDictKeys(self):
+    """Returns dictionary of network data about instance.
+    """
+    r = self.getResponse()
+    my_networking_dict = r.json()['vm_info']['xenstore_data']
+    keys = my_networking_dict.keys()
+    return keys
+
+  def getNetworkData(self, iptype):
+    """Return dictionary of private or public network data - based on 'iptype' passed.
+    'iptype' input parameter will be either 'public' or 'private'
+    """
+    r = self.getResponse()
+    my_network_keys = self.getNetworkingDictKeys()
     my_ips = []
-    for line in my_networking_keys:
+    my_networks = []
+    
+    for line in my_network_keys:
       if re.search('{0}'.format('networking'), line): 
-        mynetworks.append(line)
-    for ntwrk in mynetworks:
-      x = str(response.json()['vm_info']['xenstore_data'][ntwrk])
+        my_networks.append(line)
+    for ntwrk in my_networks:
+      x = str(r.json()['vm_info']['xenstore_data'][ntwrk])
       my_ips.append(x)
     for item in my_ips:
       y = json.loads(item)
@@ -262,17 +322,28 @@ class OhThree():
         public_network = {}
         for key in mykeys:
           public_network.update({key:y[key]})
-    filtered_private_network = {key:private_network[key] for key in private_network if key!='ip6s' and key!='gateway_v6'}
-    filtered_public_network = {key:public_network[key] for key in public_network if key!='ip6s' and key!='gateway_v6'}
-    #This is my table setup before calling format_as_table()
-    broadcast_public_ip = filtered_public_network['broadcast']
-    mac_public_ip = filtered_public_network['mac']
-    dns_servers_public = filtered_public_network['dns']
-    label_public = filtered_public_network['label']
-    broadcast_private_ip = filtered_private_network['broadcast']
-    mac_private_ip = filtered_private_network['mac']
-    dns_servers_private = filtered_private_network['dns']
-    label_private = filtered_private_network['label']
+    #Return dictionary of public network data
+    if iptype == 'public':
+      filtered_public_network = {key:public_network[key] for key in public_network if key!='ip6s' and key!='gateway_v6'}
+      return filtered_public_network
+    #Return dictionary of private network data
+    if iptype == 'private':
+      filtered_private_network = {key:private_network[key] for key in private_network if key!='ip6s' and key!='gateway_v6'}
+      return filtered_private_network
+  
+    ##---..---use these templates for ip isolation
+    #broadcast_public_ip = filtered_public_network['broadcast']
+    #self.broadcast_public_ip = broadcast_public_ip
+    #print self.broadcast_public_ip
+    #
+    #mac_public_ip = filtered_public_network['mac']
+    #dns_servers_public = filtered_public_network['dns']
+    #label_public = filtered_public_network['label']
+    #broadcast_private_ip = filtered_private_network['broadcast']
+    #mac_private_ip = filtered_private_network['mac']
+    #dns_servers_private = filtered_private_network['dns']
+    #label_private = filtered_private_network['label']
+    
     header = ['LABEL', 'SERVER IP', 'GATEWAY', 'NETMASK', 'STATUS' ] #<---status is enabled/disabled. label is public/private
     keys = ['label', 'ip', 'gateway', 'netmask', 'status' ]
     sort_by_key = 'label'
@@ -304,22 +375,18 @@ class OhThree():
       gateway = i['gateway']
       netmask = i['netmask']
       data.append({'label':label_private, 'ip':ip, 'gateway':gateway, 'netmask':netmask, 'status':status})
-    print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
-    print ""
-    print ""
-    
-    #This will return information about the VDI tree/chain
-    myTitle('VDI Chain')
-    for attribute in my_vdi_list:
-      print "UUID: \t %s" %  attribute['uuid']
-      print "Name: \t   %s" % attribute['name']
-      #print "Snapshot: \t   %s" % attribute['snapshots']
-      print "Disk size: \t  %s" % byte_converter(int(attribute['virtual_size']))
-      print "Disk utilization:  %s" % byte_converter(int(attribute['phy_utilization']))
-      print ""
-    vdis.append(attribute['uuid'])
-    print ""
-    print ""
+
+
+#END CLASSES ^^
+############################
+# START FUNCTIONS SECTION
+
+def my_Requests(url):
+  """Used to grab the url and parse/format relevant information.  Used by OhThree() """
+  # url below example: https://alerts.ohthree.com/api/vminfo/04be189d-d7aa-4b93-8cf3-244de776f03c
+  response = requests.get(url=url, verify=False)
+  assert response.status_code == 200
+  return response
 
 def terminal_size():
   """Get the terminal row and column length for building fit-to-screen content"""
@@ -344,7 +411,8 @@ def time_converter(cloud_time):
   more user-friendly format.  Sample return is 'Fri May  3 14:33:24 2013'
   """
   dt = parser.parse(cloud_time)
-  return dt.ctime()
+  #return dt.ctime()
+  return "%d/%d/%d" % (dt.month, dt.day, dt.year)
   
 def requests(url):
   response = requests.get(url=url, verify=False)
@@ -848,8 +916,16 @@ def getCNlist():
   #Connect to cloud files by region and create a list of containers in each region.
   cf_ord = pyrax.connect_to_cloudfiles(region='ORD')
   cf_dfw = pyrax.connect_to_cloudfiles(region='DFW')
-  dfw_containers = cf_dfw.list_containers_info()
-  ord_containers = cf_ord.list_containers_info()
+  ord_containers = []
+  dfw_containers = []
+  try:
+    dfw_containers = cf_dfw.list_containers_info()
+  except:
+    pass
+  try:
+    ord_containers = cf_ord.list_containers_info()
+  except:
+    pass
   
   #All containers combined into one list
   all_containers = dfw_containers + ord_containers
