@@ -916,8 +916,10 @@ def getCNlist():
   #Connect to cloud files by region and create a list of containers in each region.
   cf_ord = pyrax.connect_to_cloudfiles(region='ORD')
   cf_dfw = pyrax.connect_to_cloudfiles(region='DFW')
+  cf_lon = pyrax.connect_to_cloudfiles(region='LON')
   ord_containers = []
   dfw_containers = []
+  lon_containers = []
   try:
     dfw_containers = cf_dfw.list_containers_info()
   except:
@@ -926,9 +928,13 @@ def getCNlist():
     ord_containers = cf_ord.list_containers_info()
   except:
     pass
+  try:
+    lon_containers = cf_lon.list_containers_info()
+  except:
+    pass
   
   #All containers combined into one list
-  all_containers = dfw_containers + ord_containers
+  all_containers = dfw_containers + ord_containers + lon_containers
   
   #Capture a running total count of all containers combined
   total_obj = 0
@@ -957,6 +963,15 @@ def getCNlist():
   #Gather a list of ord containers and append them to the list named data
   for cn in ord_containers:
     region = 'ORD'
+    number_bytes = int(cn['bytes'])
+    size = byte_converter(number_bytes)
+    count = cn['count']
+    name = cn['name']
+    data.append({'name':name, 'total_objects':count, 'region':region, 'size':size})
+    
+  #Gather a list of lon containers and append them to the list named data
+  for cn in lon_containers:
+    region = 'LON'
     number_bytes = int(cn['bytes'])
     size = byte_converter(number_bytes)
     count = cn['count']
