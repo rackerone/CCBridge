@@ -913,6 +913,9 @@ def getCNlist():
   #create a connection to cloud files for later use if necessary
   cfiles = pyrax.cloudfiles
   
+  #Save default region
+  def_region = pyrax.default_region
+  
   #Connect to cloud files by region and create a list of containers in each region.
   cf_ord = pyrax.connect_to_cloudfiles(region='ORD')
   cf_dfw = pyrax.connect_to_cloudfiles(region='DFW')
@@ -1045,6 +1048,7 @@ def getCNlist():
   print ""
   print "Total Objects = %s " % total_obj
   print "Total Space Consumed = %s" % byte_converter(total_bytes)
+  print "Default Region = %s" % def_region
   print ""
   print ""
   
