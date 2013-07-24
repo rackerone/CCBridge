@@ -1166,4 +1166,5 @@ try:
 except KeyboardInterrupt, e:
   curses.endwin() #VITAL! This closes out the menu system and returns you to the bash prompt.
 curses.endwin() #VITAL! This closes out the menu system and returns you to the bash prompt.
-os.system('clear')
+#os.system('clear')
+os.system('cls' if os.name=='nt' else 'clear')
