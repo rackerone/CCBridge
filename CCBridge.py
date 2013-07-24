@@ -19,6 +19,7 @@
 """
 todo:
 -install https://github.com/justinsb/python-novatools.git for first generation server support
+-add 'cdn enabled' to cloud files table
 -add disk size, and used space to server list   alerts.ohthree.com  (get allocated from "root_gb": 160,  in reports.ohthree.com)
 -add flavor/ram/os/vcpu to server list   reports.ohthree.com
 -add support for cloud backup (show activity)
@@ -28,7 +29,6 @@ todo:
   This will be a good mechanism to find flag potentials errors.  I have found cases where names differ.  I believe
   the pyrax-found name is correct and the "vm-data/hostname" found name is possibly incorrect.  VM-data is found using
   ohthree API and pulled from xenstore database.  This database entry could be incorrect but still investigating.
-  Test with 7744cc2f-f4e1-4c3b-8003-1c72f6339d4c
 -add 'total cloud files space consumed'    <---DONE
 -if no servers, print "no servers" instead of blank table
 - show the X-Storage-URL...see below
@@ -921,15 +921,18 @@ def getCNlist():
   dfw_containers = []
   lon_containers = []
   try:
-    dfw_containers = cf_dfw.list_containers_info()
+    #dfw_containers = cf_dfw.list_containers_info()
+    dfw_containers = cf_dfw.get_all_containers()
   except:
     pass
   try:
-    ord_containers = cf_ord.list_containers_info()
+    #ord_containers = cf_ord.list_containers_info()
+    ord_containers = cf_ord.get_all_containers()
   except:
     pass
   try:
-    lon_containers = cf_lon.list_containers_info()
+    #lon_containers = cf_lon.list_containers_info()
+    lon_containers = cf_lon.get_all_containers()
   except:
     pass
   
@@ -948,11 +951,14 @@ def getCNlist():
   #Gather a list of dfw containers and append them to the list named data
   for cn in dfw_containers:
     region = 'DFW'
-    number_bytes = int(cn['bytes'])
+    #number_bytes = int(cn['bytes'])
+    number_bytes = cn.total_bytes
     size = byte_converter(number_bytes)
-    count = cn['count']
-    name = cn['name']
-    data.append({'name':name, 'total_objects':count, 'region':region, 'size':size})
+    #count = cn['count']
+    count = cn.object_count
+    name = cn.name
+    cdn = cn.cdn_enabled
+    data.append({'name':name, 'total_objects':count, 'region':region, 'cdn':cdn, 'size':size})
     
     #Increment total_obj by the number of objects in the current container
     total_obj += count
@@ -963,20 +969,22 @@ def getCNlist():
   #Gather a list of ord containers and append them to the list named data
   for cn in ord_containers:
     region = 'ORD'
-    number_bytes = int(cn['bytes'])
+    number_bytes = cn.total_bytes
     size = byte_converter(number_bytes)
-    count = cn['count']
-    name = cn['name']
-    data.append({'name':name, 'total_objects':count, 'region':region, 'size':size})
+    count = cn.object_count
+    name = cn.name
+    cdn = cn.cdn_enabled
+    data.append({'name':name, 'total_objects':count, 'region':region, 'cdn':cdn, 'size':size})
     
   #Gather a list of lon containers and append them to the list named data
   for cn in lon_containers:
     region = 'LON'
-    number_bytes = int(cn['bytes'])
+    number_bytes = cn.total_bytes
     size = byte_converter(number_bytes)
-    count = cn['count']
-    name = cn['name']
-    data.append({'name':name, 'total_objects':count, 'region':region, 'size':size})
+    count = cn.object_count
+    name = cn.name
+    cdn = cn.cdn_enabled
+    data.append({'name':name, 'total_objects':count, 'region':region, 'cdn':cdn, 'size':size})
     
     #Increment total_obj by the number of objects in the current container
     total_obj += count
@@ -985,8 +993,8 @@ def getCNlist():
     total_bytes += number_bytes
   
   #Set up table varaibles and print table
-  header = ['Container Name', 'Total Objects', 'Region', 'Size' ]
-  keys = ['name', 'total_objects', 'region', 'size' ]
+  header = ['Container Name', 'Total Objects', 'Region', 'CDN Enabled', 'Size' ]
+  keys = ['name', 'total_objects', 'region', 'cdn', 'size' ]
   sort_by_key = 'total_objects'
   sort_order_reverse = True
   print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
