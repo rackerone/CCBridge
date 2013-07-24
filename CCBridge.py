@@ -957,8 +957,21 @@ def getCNlist():
     #count = cn['count']
     count = cn.object_count
     name = cn.name
+    cdn_logs = cn.cdn_log_retention
+    cdn_logs_table = '---'
     cdn = cn.cdn_enabled
-    data.append({'name':name, 'total_objects':count, 'region':region, 'cdn':cdn, 'size':size})
+    cdn_table = '---'
+    uri = '---'
+    if cdn:
+      uri = cn.cdn_uri
+      cdn_table = cdn
+    data.append({'name':name,
+                 'total_objects':count,
+                 'region':region,
+                 'size':size,
+                 'cdn':cdn_table,
+                 'cdn_logs':cdn_logs_table,
+                 'http_uri':uri})
     
     #Increment total_obj by the number of objects in the current container
     total_obj += count
@@ -973,9 +986,27 @@ def getCNlist():
     size = byte_converter(number_bytes)
     count = cn.object_count
     name = cn.name
+    cdn_logs = cn.cdn_log_retention
+    cdn_logs_table = '---'
     cdn = cn.cdn_enabled
-    data.append({'name':name, 'total_objects':count, 'region':region, 'cdn':cdn, 'size':size})
+    cdn_table = '---'
+    uri = '---'
+    if cdn:
+      uri = cn.cdn_uri
+      cdn_table = cdn
+    data.append({'name':name,
+                 'total_objects':count,
+                 'region':region,
+                 'size':size,
+                 'cdn':cdn_table,
+                 'cdn_logs':cdn_logs_table,
+                 'http_uri':uri})
+    #Increment total_obj by the number of objects in the current container
+    total_obj += count
     
+    #Increment total_bytes by the number of bytes in variable 'number_bytes'
+    total_bytes += number_bytes
+
   #Gather a list of lon containers and append them to the list named data
   for cn in lon_containers:
     region = 'LON'
@@ -983,9 +1014,21 @@ def getCNlist():
     size = byte_converter(number_bytes)
     count = cn.object_count
     name = cn.name
+    cdn_logs = cn.cdn_log_retention
+    cdn_logs_table = '---'
     cdn = cn.cdn_enabled
-    data.append({'name':name, 'total_objects':count, 'region':region, 'cdn':cdn, 'size':size})
-    
+    cdn_table = '---'
+    uri = '---'
+    if cdn:
+      uri = cn.cdn_uri
+      cdn_table = cdn
+    data.append({'name':name,
+                 'total_objects':count,
+                 'region':region,
+                 'size':size,
+                 'cdn':cdn_table,
+                 'cdn_logs':cdn_logs_table,
+                 'http_uri':uri})    
     #Increment total_obj by the number of objects in the current container
     total_obj += count
     
@@ -993,8 +1036,8 @@ def getCNlist():
     total_bytes += number_bytes
   
   #Set up table varaibles and print table
-  header = ['Container Name', 'Total Objects', 'Region', 'CDN Enabled', 'Size' ]
-  keys = ['name', 'total_objects', 'region', 'cdn', 'size' ]
+  header = ['Container Name', 'Total Objects', 'Region', 'Size', 'CDN Enabled', 'CDN Logs Enabled', '  HTTP CDN Base URL  ' ]
+  keys = ['name', 'total_objects', 'region', 'size', 'cdn', 'cdn_logs', 'http_uri' ]
   sort_by_key = 'total_objects'
   sort_order_reverse = True
   print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
