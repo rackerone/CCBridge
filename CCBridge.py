@@ -19,7 +19,7 @@
 """
 todo:
 -install https://github.com/justinsb/python-novatools.git for first generation server support
--add 'cdn enabled' to cloud files table
+-add 'cdn enabled' to cloud files table       <----DONE
 -add disk size, and used space to server list   alerts.ohthree.com  (get allocated from "root_gb": 160,  in reports.ohthree.com)
 -add flavor/ram/os/vcpu to server list   reports.ohthree.com
 -add support for cloud backup (show activity)
@@ -42,6 +42,7 @@ X-Storage-Url: https://storage101.dfw1.clouddrive.com/v1/MossoCloudFS_cefef46-82
 from time import sleep
 import curses
 from curses import wrapper
+import sys
 import os
 import curses.wrapper  #this will help reset terminal by catching exceptions and preventing effed up shells
 import pyrax
@@ -49,6 +50,7 @@ import requests
 from urlparse import urlparse
 from urlparse import urlunparse
 import json
+from types import *          #<-----good for 'assert type(x) is IntType|StringType, 'message here if exception %r' % x'
 from dateutil import parser     #<----dependency for time_converter()
 from operator import itemgetter
 from math import log   #<----dependency for byte_converter()
@@ -69,6 +71,7 @@ data = []     #<---- this is a list of dictionaries.  Used with format_as_table(
 titles = []   #<---this is a list that contains the title_row ..[('x', 'y'), ('z', 'w')].  Used with format_as_table()
 unit_list = zip(['bytes', 'kB', 'MB', 'GB', 'TB', 'PB'], [0, 0, 1, 2, 2, 2])     #<-- used in bytes conversion in byte_converter()
 RACKER = False
+SPACER = "\n\n"   #<---this will provide a blank two-line seperator for formatting purposes
 
 #set identity class
 pyrax.set_setting('identity_type', 'rackspace')
@@ -226,13 +229,13 @@ class OhThree():
     return self.path
   
   def getPowerState(self):
+    """Return the current power state of server"""
     r = self.getResponse()
     my_power_state = r.json()['vm_info']['power_state']
     return my_power_state
   
   def getVDIList(self):
-    """Return dictionaries containing VDI chain details.
-    """
+    """Return dictionaries containing VDI chain details."""
     r = self.getResponse()
     my_vdi_list = r.json()['vm_info']['vdi_list']
     return my_vdi_list
@@ -279,15 +282,13 @@ class OhThree():
     return my_storage_repository
   
   def getNetworkingDict(self):
-    """Returns dictionary of network data about instance.
-    """
+    """Returns dictionary of network data about instance."""
     r = self.getResponse()
     dict = r.json()['vm_info']['xenstore_data']
     return dict
 
   def getNetworkingDictKeys(self):
-    """Returns dictionary of network data about instance.
-    """
+    """Returns dictionary of network data about instance."""
     r = self.getResponse()
     my_networking_dict = r.json()['vm_info']['xenstore_data']
     keys = my_networking_dict.keys()
@@ -385,7 +386,7 @@ def my_Requests(url):
   """Used to grab the url and parse/format relevant information.  Used by OhThree() """
   # url below example: https://alerts.ohthree.com/api/vminfo/04be189d-d7aa-4b93-8cf3-244de776f03c
   response = requests.get(url=url, verify=False)
-  assert response.status_code == 200
+  assert response.status_code == 200, 'Attempted to access %r but received return code %r' % (url, response.status_code)
   return response
 
 def terminal_size():
@@ -395,6 +396,7 @@ def terminal_size():
 
 def byte_converter(num):
   """Use this to convert bytes to human readable sizes"""
+  assert type(int(num)) is IntType, 'Data supplied to byte_converter(num) is not an integer --> num = %r' % num
   if num > 1:
     exponent = min(int(log(num, 1024)), len(unit_list) - 1)
     quotient = float(num) / 1024**exponent
@@ -415,8 +417,11 @@ def time_converter(cloud_time):
   return "%d/%d/%d" % (dt.month, dt.day, dt.year)
   
 def requests(url):
+  """This function may not be needed!  At very least it should be renamed to no conflict with the real
+  'requests' module
+  """
   response = requests.get(url=url, verify=False)
-  assert response.status_code == 200
+  assert response.status_code == 200, 'Attempted to access %r but received return code %r' % (url, response.status_code)
   # url below example: https://alerts.ohthree.com/api/vminfo/04be189d-d7aa-4b93-8cf3-244de776f03c
   url = 'https://alerts.ohthree.com/api/vminfo/' + instance_uuid
   headers_ohthree = {'Content-Type': 'application/json'}
@@ -498,8 +503,7 @@ def myTitle(title):
   print upper_title_line 
   print y + title + y
   print lower_title_line
-  print ""
-  print ""
+  print SPACER
   print ""
 
 def my_half_Title(title):
@@ -520,8 +524,10 @@ def my_half_Title(title):
   print ""
 
 def clear_screen():
-  print ""
-  print ""
+  """This function is used to pause and allow the user to view the table output.  You can hit 'enter' or keyboard your way out of the table
+  view gracefully
+  """
+  print SPACER
   try:
     input("Press Enter to continue...")
     screen.clear()
@@ -534,26 +540,30 @@ def clear_screen():
 #  my_api_key = pyrax.identity.api_key
 #  print "API key: %s" % my_api_key
 
-#print token
 def token():
+  """Call this function to print string containing current auth token"""
   token = pyrax.identity.token
   print "Todays Token: %s" % token
 
-#print expiration date
+
 def expires():
+  """Call this function to print string containing the current auth token expiration time"""
   expires = pyrax.identity.expires
   print "Token Expires: %s" % expires
   
-# get authenticated user
 def authenticated_user():
+  """Call this funtion to print string containing the current authed username"""
   clouduser = pyrax.identity.username
   print "Authenticated user: %s" % clouduser
 
 def default_region():
+  """Call this function to print string containing the current default region for authed user"""
   dregion = pyrax.identity.user['default_region']
   print "Default region: %s" % dregion
 
 def name():
+  """Call this function to print string containing the current authed username.  This is almost a duplicate of authenticated_user()
+  so it may be able to be deprecated"""
   customer_username = pyrax.identity.username
   print "Username: %s" % customer_username
 
@@ -567,15 +577,14 @@ def print_cust_ddi():
   print "DDI: %s" % tenant_ID()
   
 def getcreds():
+  """Call this function to authenticate.  It will set credentials using local credentials file (~/.rackspace_cloud_credentials)"""
   try:
     #set crentials
-    pyrax.set_credential_file(CREDS_FILE)
+    pyrax.set_credential_file(CREDS_FILE, authenticate=True)
   except Exception, e:
-    print ""
-    print ""
+    print SPACER
     print e
-    print ""
-    print ""
+    print SPACER
     clear_screen()
   else:
     auth_successful = pyrax.identity.authenticated
@@ -591,19 +600,20 @@ def getcreds():
     clear_screen()
 
 def services():
+  """Call this function to print service catalogue, as json data, for authed user"""
   services = json.dumps(pyrax.identity.services, sort_keys=True, indent=2, separators=(',', ': '))
   print services
   clear_screen()
 
 def input_user_creds():
-  print ""
-  print ""
+  """Call this function when you need to manually enter credentials.  It will prompt for user input and
+  authenticate using provided credentials.  It will print the authentication information for provided user/creds"""
+  print SPACER
   username = raw_input("Enter customer username: ")
   apikey = raw_input("Enter customer API key: ")
   pyrax.set_credentials(username, apikey)
   auth_successful = pyrax.identity.authenticated
-  print ""
-  print ""
+  print SPACER
   print "Authentication successful: %s" % auth_successful
   name()
   print_cust_ddi()
@@ -613,6 +623,7 @@ def input_user_creds():
   clear_screen()
 
 def auth_check():
+  """Call this function to return True/False regarding status of current auth.  Am I authenticated as a user or not"""
   authed = pyrax.identity.authenticated
   if authed:
     return True
@@ -620,52 +631,69 @@ def auth_check():
     return False
 
 def not_authed():
-  print ""
-  print ""
-  print "Not Authenticated!"
+  """If not authenticated print string message telling user to authenticate."""
+  print SPACER
+  print "Not Authenticated!\n  Please authenticate using option #1 (use local credentials file) or use option #2 (enter credentials manually)"
   clear_screen()
 
 def show_credentials():
-#  authed = pyrax.identity.authenticated
-  if auth_check():
-    print ""
-    print ""
-    name()
-    print_cust_ddi()
-    #get_API_key()
-    token()
-    expires()
-    default_region()
-    clear_screen()
-  else:
+  """Print the current authenticated credentials"""
+  #authed = pyrax.identity.authenticated
+  try:
+    if auth_check():
+      print ""
+      print ""
+      name()
+      print_cust_ddi()
+      #get_API_key()
+      token()
+      expires()
+      default_region()
+      clear_screen()
+  except:
     not_authed()
-    clear_screen()
+    #clear_screen()
 
 def flavorlist():
-  print ""
-  print ""
+  """Print all available flavors with details"""
+  print SPACER
+  #Draw title bar with included string
   myTitle('MY FLAVOR LIST')
+  
+  #Create connection to the cloud and create object containing list of flavors
   cs = pyrax.cloudservers
   flvrs = cs.flavors.list()
   my_flvrs = [flvr for flvr in flvrs]
+  
+  #Create list named 'data' to be used for table input
+  data = []
+  
+  #Set up table variables and print table
   header = ['Flavor Name', 'ID', 'RAM', 'Disk', 'VCPUs', 'Swap' ]
   keys = ['name', 'id', 'ram', 'disk', 'vcpus', 'swap' ]
   sort_by_key = 'id'
   sort_order_reverse = False
-  data = []
   for flv in my_flvrs:
     data.append({'name':flv.name, 'id':flv.id, 'ram':flv.ram, 'disk':flv.disk, 'vcpus':flv.vcpus, 'swap':flv.swap})
-  print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
-  clear_screen()
+  try:
+    print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
+    clear_screen()
+  except Exception, e:
+    print SPACER
+    #print the exception to screen and allow graceful return to program
+    print e
+    print SPACER
+    clear_screen()
+  #print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
+  #clear_screen()
 
 def serverlist():
   """Use to create a table containing list of servers by region.  This list will contain server details formatted
   nicely"""
-  print ""
-  print ""
+  print SPACER
   #Draw title bar with included string
   myTitle('CLOUD SERVERS')
-  
+
   #Create connection to cloud servers and get list of servers.  Also set up
   # various variables for server iteration.  Seperate lists by region.
   cs = pyrax.cloudservers  #use cs.servers.list()
@@ -678,75 +706,119 @@ def serverlist():
   ord_servers = svrs_ord.servers.list()
   my_ord_servers = [svr for svr in ord_servers]
   all_servers = dfw_servers + ord_servers
-  
+
   #Create list named 'data' to be used for table input
   data = []
   
   #Iterate servers by region and append to server details to 'data'.
   status = ''
-  for pos, svr in enumerate(my_dfw_servers):
-    region = 'DFW'
-    public_ip = []
-    private_ip = []
-    for i in range(len(svr.addresses['public'])):
-      if svr.addresses['public'][i]['version'] == 4:
-        public_ip.append(svr.addresses['public'][i]['addr'])
-        public_ip = ",".join(public_ip)
-    for i in range(len(svr.addresses['private'])):
-      if svr.addresses['private'][i]['version'] == 4:
-        private_ip.append(svr.addresses['private'][i]['addr'])
-        private_ip = ",".join(private_ip)
-    data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':svr.status, 'progress':svr.progress, 'created':time_converter(svr.created)})
-  for pos, svr in enumerate(my_ord_servers):
-    region = 'ORD'
-    public_ip = []
-    private_ip = []
-    for i in range(len(svr.addresses['public'])):
-      if svr.addresses['public'][i]['version'] == 4:
-        public_ip.append(svr.addresses['public'][i]['addr'])
-        public_ip = ",".join(public_ip)
-    for i in range(len(svr.addresses['private'])):
-      if svr.addresses['private'][i]['version'] == 4:
-        private_ip.append(svr.addresses['private'][i]['addr'])
-        private_ip = ",".join(private_ip)
-    data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':svr.status, 'progress':svr.progress, 'created':time_converter(svr.created)})
+  try:
+    if len(my_dfw_servers) != 0:
+      for pos, svr in enumerate(my_dfw_servers):
+        region = 'DFW'
+        public_ip = []
+        private_ip = []
+        try:
+          for i in range(len(svr.addresses['public'])):
+            if svr.addresses['public'][i]['version'] == 4:
+              public_ip.append(svr.addresses['public'][i]['addr'])
+              public_ip = ",".join(public_ip)
+          for i in range(len(svr.addresses['private'])):
+            if svr.addresses['private'][i]['version'] == 4:
+              private_ip.append(svr.addresses['private'][i]['addr'])
+              private_ip = ",".join(private_ip)
+        except:
+          pass
+        data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':svr.status, 'progress':svr.progress, 'created':time_converter(svr.created)})
+  except:
+    pass
+
+  try:
+    if len(my_ord_servers) != 0:
+      for pos, svr in enumerate(my_ord_servers):
+        region = 'ORD'
+        public_ip = []
+        private_ip = []
+        try:
+          for i in range(len(svr.addresses['public'])):
+            if svr.addresses['public'][i]['version'] == 4:
+              public_ip.append(svr.addresses['public'][i]['addr'])
+              public_ip = ",".join(public_ip)
+          for i in range(len(svr.addresses['private'])):
+            if svr.addresses['private'][i]['version'] == 4:
+              private_ip.append(svr.addresses['private'][i]['addr'])
+              private_ip = ",".join(private_ip)
+        except:
+          pass
+        data.append({'pos': pos + 1, 'name':svr.name, 'public_ip':public_ip, 'private_ip':private_ip, 'UUID':svr.id, 'region':region, 'status':svr.status, 'progress':svr.progress, 'created':time_converter(svr.created)})
+  except:
+    pass
   
   #Set up table variables and print table
   header = ['Server Name', 'Region', 'Instance UUID', '  Public IP  ', '  Private IP  ', 'Status', 'Progress', 'Created Date' ]
   keys = ['name', 'region', 'UUID', 'public_ip', 'private_ip', 'status', 'progress', 'created' ]
   sort_by_key = 'region'
   sort_order_reverse = False
-  print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
-  clear_screen()
+  try:
+    print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
+    clear_screen()
+  except Exception, e:
+    print SPACER
+    #print the exception to screen and allow graceful return to program
+    print e
+    print SPACER
+    clear_screen()
+  #print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
+  #clear_screen()
 
 def getimagelist(base=False):
   """Interact with images using this function.  Passing base=True will print base images from Rackspace.
   Leaving base=false will return your saved images and NOT base images from Rackspace.
   """
-  print ""
-  print ""
+  print SPACER
   #Draw title bar with included string
   myTitle('MY IMAGES')
   
   #Create connection to cloud servers
-  cs = pyrax.cloudservers
+  try:
+    cs = pyrax.cloudservers
+  except:
+    print "Unable to connect to pyrax.cloudservers"
+    clear_screen()
   
   #Create base image list
   all_base_images = cs.images.list()
   base_images = [img for img in all_base_images if not hasattr(img, "server")]
   
-  #Create connection to cloud servers with region set to DFW
-  svrs_dfw = pyrax.connect_to_cloudservers(region="DFW")
+  #Initialize variables containing image lists for each region
+  dfw_images = []
+  ord_images = []
+  lon_images = []
   
-  #Create connection to cloud servers with region set to ORD
-  svrs_ord = pyrax.connect_to_cloudservers(region="ORD")
+  #Create connection to cloud servers with region set to DFW and create an object to hold list of images
+  try:
+    svrs_dfw = pyrax.connect_to_cloudservers(region="DFW")
+    dfw_images = svrs_dfw.images.list()
+  except:
+    #print "Unable to connect to cloudservers DFW"
+    pass
   
-  #Create list images for DFW and ORD, respectively
-  dfw_images = svrs_dfw.images.list()
-  ord_images = svrs_ord.images.list()
+  #Create connection to cloud servers with region set to ORD and create an object to hold list of images
+  try:
+    svrs_ord = pyrax.connect_to_cloudservers(region="ORD")
+    ord_images = svrs_ord.images.list()
+  except:
+    pass
+  
+  #Create connection to cloud servers with region set to LON and create an object to hold list of images
+  try:
+    svrs_lon = pyrax.connect_to_cloudservers(region="LON")
+    lon_images = svrs_ord.images.list()
+  except:
+    pass
   
   #Gather all images together into one object named 'all_images'
-  all_imgs = dfw_images + ord_images
+  all_imgs = dfw_images + ord_images + lon_images
   
   #Create iterable list object of all images with the attribute 'server', which means it is
   # a saved image and not a base image from Rackspace
@@ -755,15 +827,14 @@ def getimagelist(base=False):
   
   #If no saved images then do not print table.  Print message instead
   if not images:
-    print ""
-    print ""
+    print SPACER
     print "You have no images!"
     clear_screen()
     
   #Create iterable list of saved images (not base) in DFW and ORD, respectively
   my_dfw_images = [img for img in dfw_images if hasattr(img, "server")]
   my_ord_images = [img for img in ord_images if hasattr(img, "server")]
-  
+  my_lon_images = [img for img in lon_images if hasattr(img, "server")]
   
   #create list named data (or delete contents if exists).  This list used as input for format_as_table()
   data = []
@@ -777,8 +848,15 @@ def getimagelist(base=False):
     sort_order_reverse = False
     for img in base_images:
       data.append({'name':img.name, 'ID':img.id})
-    print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
-    clear_screen()
+    try:
+      print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
+      clear_screen()
+    except Exception, e:
+      print SPACER
+      #print the exception to screen and allow graceful return to program
+      print e
+      print SPACER
+      clear_screen()
   else:
     #If base=False (default) then set up table to print saved iamges
     header = ['Image Name', 'Region', 'Image ID', 'Min RAM', 'Min Disk', 'Status', 'Progress' ]
@@ -791,17 +869,31 @@ def getimagelist(base=False):
     for pos, img in enumerate(my_ord_images):
       region = 'ORD'
       data.append({'pos':pos + 1, 'name':img.name, 'region':region, 'ID':img.id, 'minram':img.minRam, 'mindisk':img.minDisk, 'status':img.status, 'progress':img.progress})
-    print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
-    clear_screen()
+    for pos, img in enumerate(my_lon_images):
+      region = 'LON'
+      data.append({'pos':pos + 1, 'name':img.name, 'region':region, 'ID':img.id, 'minram':img.minRam, 'mindisk':img.minDisk, 'status':img.status, 'progress':img.progress})
+    try:
+      print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
+      clear_screen()
+    except Exception, e:
+      print SPACER
+      #print the exception to screen and allow graceful return to program
+      print e
+      print SPACER
+      clear_screen()
 
 def getLBlist():
-  print ""
-  print ""
+  """Report information about cloud load balancers"""
+  print SPACER
   #Print title bar with lincluded string
   myTitle('MY LOAD BALANCERS')
   
   #Create connection to cloud load balancers
-  lb = pyrax.cloud_loadbalancers
+  try:
+    lb = pyrax.cloud_loadbalancers
+  except:
+    print "Unable to connect to cloud load balancers!"
+    clear_screen()
   
   #Capture all load balancers in an object
   all_lbs = lb.list()
@@ -811,41 +903,57 @@ def getLBlist():
   
   #create list named data (or delete contents if exists).  This list used as input for format_as_table()
   data = []
+  
+  #for every load balancer add dict of details to data list
   for pos, lb in enumerate(lbs):
     public_ip = lb.virtual_ips[0].address
     data.append({'pos': pos + 1, 'name':lb.name, 'public_ip':public_ip, 'protocol':lb.protocol, 'port':lb.port, 'status':lb.status})
   
-  #Set up table varaibles
+  #Set up table varaibles and print table
   header = [ 'Load Balancer Name', '  IP Address  ', 'Protocol', 'Port', 'Status' ]
   keys = [ 'name', 'public_ip', 'protocol', 'port', 'status' ]
   sort_by_key = 'status'
   sort_order_reverse = False
   #If no load balancers exist don't print table, else print table with data
   if not lbs:
-    print ""
-    print ""
+    print SPACER
     print "You have no load balancers!"
+    print SPACER
     clear_screen()
   else:
-    print ""
-    print ""
-    print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
-    clear_screen()
+    try:
+      print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
+      clear_screen()
+    except Exception, e:
+      print SPACER
+      #print the exception to screen and allow graceful return to program
+      print e
+      print SPACER
+      clear_screen()
 
 def getDBlist():
-  pass
+  """Provide information about cloud databases"""
+  print SPACER
+  print "This function is not support at this time"
+  print SPACER
+  clear_screen()
 
 def getDNSlist():
-  print ""
-  print ""
-  #Draw title line with string cincluded
+  """Report all DNS records/domains registered with cloud account"""
+  print SPACER
+  #Draw title line with string included
   myTitle('CLOUD DNS')
   
-  #Create connection to cloud DNS
-  dns = pyrax.cloud_dns
-  
-  #Save DNS domains into list
-  dns_domains = dns.list()
+  #Create connection to cloud DNS and list as object
+  try:
+    dns = pyrax.cloud_dns
+    dns_domains = dns.list()
+  except Exception, e:
+    print SPACER
+    print "Unable to create connection to cloud_dns"
+    print SPACER
+    print e
+    clear_screen()
 
   #Gather a list of domain names and id numbers into a list of dictionaries
   dns_domain_names_id = []
@@ -869,6 +977,7 @@ def getDNSlist():
 
   #create list named data (or delete contents if exists).  This list used as input for format_as_table()
   data = []
+  
   #-->For every root domain name in the list dns_data...
   for x in range(len(dns_data)):
     #-->For every DNS record within each root domain...
@@ -883,58 +992,68 @@ def getDNSlist():
       #If the dns record is the first in the list - or record 0- then use actual domain name in table column
       if y == 0:
         #Append information to the list 'data' to be used in format_as_table()
-        data.append({'domain':(domainName + pad), 'dns_record':(dns_data[x][y].name + pad), 'target':(dns_data[x][y].data + pad), 'record_type':dns_data[x][y].type, 'created':(dns_data[x][y].created + pad), 'ttl':dns_data[x][y].ttl })
+        data.append({'domain':(domainName + pad), 'dns_record':(dns_data[x][y].name + pad), 'target':(dns_data[x][y].data + pad), 'record_type':dns_data[x][y].type, 'created':time_converter((dns_data[x][y].created) + pad), 'ttl':dns_data[x][y].ttl })
       #Now every other DNS record within this root domain will have just 2 dashes in the domain name table column
       else:
         #set domain name table column to 2 dashes
         domainName = '   --  '
         #Append information to the list 'data' to be used in format_as_table()
-        data.append({'domain':(domainName + pad), 'dns_record':(dns_data[x][y].name + pad), 'target':(dns_data[x][y].data + pad), 'record_type':dns_data[x][y].type, 'created':(dns_data[x][y].created + pad), 'ttl':dns_data[x][y].ttl })
+        data.append({'domain':(domainName + pad), 'dns_record':(dns_data[x][y].name + pad), 'target':(dns_data[x][y].data + pad), 'record_type':dns_data[x][y].type, 'created':time_converter((dns_data[x][y].created) + pad), 'ttl':dns_data[x][y].ttl })
   
   #Set up table varaibles and print table
-  header = [ 'Domain Name', 'DNS Record', '  Target  ', 'Record Type', 'Created', 'TTL' ]
+  header = [ 'Domain Name', 'DNS Record', '  Target  ', 'Record Type', '   Created   ', 'TTL' ]
   keys = [ 'domain', 'dns_record', 'target', 'record_type', 'created', 'ttl' ]
-  #print data
   sort_by_key = ''
   sort_order_reverse = False
-  print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
-  
-  #call clear_screen() to reset the terminal
-  clear_screen()
+  try:
+    print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
+    #call clear_screen() to reset the terminal
+    clear_screen()
+  except Exception, e:
+    print SPACER
+    #print the exception to screen and allow graceful return to program
+    print e
+    print SPACER
+    clear_screen()
 
 def getCNlist():
   #print space buffer at top of terminal for formatting purposes
-  print ""
-  print ""
+  print SPACER
   
   #Draw title bar with string included
   myTitle('CLOUD FILES')
   
   #create a connection to cloud files for later use if necessary
-  cfiles = pyrax.cloudfiles
+  try:
+    cfiles = pyrax.cloudfiles
+  except:
+    print "Unable to connect to pyrax.cloudfiles"
+    clear_screen()
   
   #Save default region
   def_region = pyrax.default_region
   
-  #Connect to cloud files by region and create a list of containers in each region.
-  cf_ord = pyrax.connect_to_cloudfiles(region='ORD')
-  cf_dfw = pyrax.connect_to_cloudfiles(region='DFW')
-  cf_lon = pyrax.connect_to_cloudfiles(region='LON')
+  #Initialize container list for each region
   ord_containers = []
   dfw_containers = []
   lon_containers = []
+  
+  #Connect to cloud files by region and create a list of containers in each region.
   try:
     #dfw_containers = cf_dfw.list_containers_info()
+    cf_dfw = pyrax.connect_to_cloudfiles(region='DFW')
     dfw_containers = cf_dfw.get_all_containers()
   except:
     pass
   try:
     #ord_containers = cf_ord.list_containers_info()
+    cf_ord = pyrax.connect_to_cloudfiles(region='ORD')
     ord_containers = cf_ord.get_all_containers()
   except:
     pass
   try:
     #lon_containers = cf_lon.list_containers_info()
+    cf_lon = pyrax.connect_to_cloudfiles(region='LON')
     lon_containers = cf_lon.get_all_containers()
   except:
     pass
@@ -1043,14 +1162,19 @@ def getCNlist():
   keys = ['name', 'total_objects', 'region', 'size', 'cdn', 'cdn_logs', 'http_uri' ]
   sort_by_key = 'total_objects'
   sort_order_reverse = True
-  print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
-  print ""
-  print ""
-  print "Total Objects = %s " % total_obj
-  print "Total Space Consumed = %s" % byte_converter(total_bytes)
-  print "Default Region = %s" % def_region
-  print ""
-  print ""
+  try:
+    print format_as_table(data, keys, header, sort_by_key, sort_order_reverse)
+    print SPACER
+    print "Total Objects = %s " % total_obj
+    print "Total Space Consumed = %s" % byte_converter(total_bytes)
+    print "Default Region = %s" % def_region
+    print SPACER
+  except Exception, e:
+    print SPACER
+    #print the exception to screen and allow graceful return to program
+    print e
+    print SPACER
+    clear_screen()
   
   #Call clear_screen() to reset the terminal
   clear_screen()
@@ -1130,7 +1254,11 @@ def processmenu(menu, parent=None):
       if menu['options'][getin]['title'] == 'Enter credentials manually':
         input_user_creds()
       if menu['options'][getin]['title'] == 'List Servers':
-      	serverlist()
+        try:
+          auth_check()
+        except:
+          not_authed()
+        serverlist()
       if menu['options'][getin]['title'] == 'List My Images':
         getimagelist()
       if menu['options'][getin]['title'] == 'List Base Images':
@@ -1145,6 +1273,8 @@ def processmenu(menu, parent=None):
         getCNlist()
       if menu['options'][getin]['title'] == 'List DNS Records':
         getDNSlist()
+      if menu['options'][getin]['title'] == 'List Databases':
+        getDBlist()
       # reset to 'current' curses environment
       curses.reset_prog_mode()
       # reset doesn't do this right
@@ -1163,8 +1293,12 @@ def processmenu(menu, parent=None):
 # This function calls showmenu and then acts on the selected item
 try:
   wrapper(processmenu(menu_data))
-except KeyboardInterrupt, e:
+except KeyboardInterrupt:
   curses.endwin() #VITAL! This closes out the menu system and returns you to the bash prompt.
-curses.endwin() #VITAL! This closes out the menu system and returns you to the bash prompt.
-#os.system('clear')
-os.system('cls' if os.name=='nt' else 'clear')
+  os.system('cls' if os.name=='nt' else 'clear')
+  sys.exit()
+finally:
+  os.system('cls' if os.name=='nt' else 'clear')
+  curses.endwin() #VITAL! This closes out the menu system and returns you to the bash prompt.
+  sys.exit()
+  
