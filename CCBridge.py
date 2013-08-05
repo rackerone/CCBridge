@@ -415,24 +415,6 @@ def time_converter(cloud_time):
   dt = parser.parse(cloud_time)
   #return dt.ctime()
   return "%d/%d/%d" % (dt.month, dt.day, dt.year)
-  
-def requests(url):
-  """This function may not be needed!  At very least it should be renamed to no conflict with the real
-  'requests' module
-  """
-  response = requests.get(url=url, verify=False)
-  assert response.status_code == 200, 'Attempted to access %r but received return code %r' % (url, response.status_code)
-  # url below example: https://alerts.ohthree.com/api/vminfo/04be189d-d7aa-4b93-8cf3-244de776f03c
-  url = 'https://alerts.ohthree.com/api/vminfo/' + instance_uuid
-  headers_ohthree = {'Content-Type': 'application/json'}
-  filters = [dict(name='name', op='like', val='%y%')]
-  params = dict(q=json.dumps(dict(filters=filters)))  #<---The query parameter q must be a JSON string.
-  #response = requests.get(url, params=params, headers=headers_ohthree)
-  #print response.text
-  #response.json()['vm_info']['power_state']
-  vm_virt_size = response.json()['vm_info']['vdi_list'][0]['virtual_size']
-  vm_phy_size = response.json()['vm_info']['vdi_list'][0]['phy_utilization']
-  print response.json()
 
 def format_as_table(data, keys, header=None, sort_by_key=None, sort_order_reverse=False):
   """Takes a list of dictionaries, formats the data, and returns
